@@ -148,7 +148,7 @@ fn world() -> Sdf {
             shininess: 0.0,
         }
     }
-    let sphere = sd_sphere(1.2, Vec3::new(-2.0, 0.0, 0.0), gold);
+    let sphere = sd_sphere(1.2, Vec3::new(2.0, 0.0, 0.0), gold);
     // let cube = sd_box(p, &params[1..=3]);
     // cube.max(-sphere) + displacement
     sphere
