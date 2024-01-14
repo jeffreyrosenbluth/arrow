@@ -108,6 +108,23 @@ fn camera(pos: Vec3, look_at: Vec3) -> Mat3 {
     Mat3::from_cols(right, up, forward)
 }
 
+fn softshadow(sdf: &Sdf, ro: Vec3, rd: Vec3, mint: f32, maxt: f32, k: f32) -> f32 {
+    let mut res: f32 = 1.0;
+    let mut t = mint;
+    for _ in 0..16 {
+        let h = sdf(ro + rd * t).sd;
+        if h < HIT_DIST {
+            return 0.0;
+        }
+        res = res.min(k * h / t);
+        t += h;
+        if t > maxt {
+            return res;
+        }
+    }
+    return res.clamp(0.0, 1.0);
+}
+
 fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, light_pos: Vec3, background: Vec3) -> Vec3 {
     let mut total_dist = 0.0;
     for _ in 0..MAX_STEPS {
@@ -116,7 +133,8 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, light_pos: Vec3, background: Vec3) -> Ve
         if dist < HIT_DIST {
             let n = normal(p, &sdf);
             let material = sdf(p).material;
-            return phong((light_pos - p).normalize(), n, rd, &material(p));
+            return phong((light_pos - p).normalize(), n, rd, &material(p))
+                * softshadow(sdf, p, (light_pos - p).normalize(), 0.1, 1.0, 2.0);
         }
         if total_dist > MAX_DIST {
             break;
