@@ -1,9 +1,9 @@
-use glam::Vec3;
+use glam::{Mat3, Vec3};
 
 const HIT_DIST: f32 = 0.001;
-const MAX_STEPS: u32 = 32;
+const MAX_STEPS: u32 = 512;
 const MAX_DIST: f32 = 1000.0;
-const EPSILON: f32 = 0.01;
+const EPSILON: f32 = 0.001;
 const WIDTH: u32 = 1024;
 const HEIGHT: u32 = 1024;
 
@@ -34,6 +34,20 @@ impl Surface {
 
     fn union(self, other: Self) -> Self {
         if self.sd < other.sd {
+            return self;
+        };
+        return other;
+    }
+
+    fn intersect(self, other: Self) -> Self {
+        if self.sd > other.sd {
+            return self;
+        };
+        return other;
+    }
+
+    fn difference(self, other: Self) -> Self {
+        if self.sd > -other.sd {
             return self;
         };
         return other;
@@ -81,6 +95,13 @@ fn normal(p: Vec3, sdf: &Sdf) -> Vec3 {
     Vec3::new(nx, ny, nz).normalize()
 }
 
+fn camera(pos: Vec3, look_at: Vec3) -> Mat3 {
+    let forward = (look_at - pos).normalize();
+    let right = Vec3::new(0.0, 1.0, 0.0).cross(forward).normalize();
+    let up = forward.cross(right).normalize();
+    Mat3::from_cols(right, up, forward)
+}
+
 fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, light_pos: Vec3) -> Vec3 {
     let mut total_dist = 0.0;
     for _ in 0..MAX_STEPS {
@@ -109,7 +130,8 @@ fn render(sdf: &Sdf, dist_to_camera: f32, light_pos: Vec3) {
                 (HEIGHT as f32 - y as f32) / (HEIGHT as f32), // flip y
                 0.0,
             );
-            let rd = Vec3::new(uv.x * 2.0 - 1.0, uv.y * 2.0 - 1.0, 1.0).normalize();
+            let rd = camera(ro, Vec3::ZERO)
+                * Vec3::new(uv.x * 2.0 - 1.0, uv.y * 2.0 - 1.0, 1.0).normalize();
             let col = march(sdf, ro, rd, light_pos);
             let offset = ((y * WIDTH + x) * 3) as usize;
             img[offset + 0] = (col.x * 255.0) as u8;
@@ -145,15 +167,15 @@ fn world() -> Sdf {
             ambient: v3((1.0 + 0.7 * (p.x.floor() + p.z.floor()) % 2.0) * 0.3),
             diffuse: v3(0.3),
             specular: Vec3::ZERO,
-            shininess: 0.0,
+            shininess: 1.0,
         }
     }
-    let sphere = sd_sphere(1.2, Vec3::new(2.0, 0.0, 0.0), gold);
-    // let cube = sd_box(p, &params[1..=3]);
-    // cube.max(-sphere) + displacement
-    sphere
+    let sphere_gold = sd_sphere(1.0, Vec3::new(-1.0, 0.0, 0.0), gold);
+    let sphere_silver = sd_sphere(0.75, Vec3::new(1.0, 0.0, 0.0), silver);
+    let floor = Box::new(move |p: Vec3| Surface::new(p.y + 1.0, checkerboard));
+    Box::new(move |q| floor(q).union(sphere_gold(q)).union(sphere_silver(q)))
 }
 
 fn main() {
-    render(&world(), 3.0, Vec3::new(2.0, 3.0, -5.0));
+    render(&world(), 3.0, Vec3::new(8.0, 6.0, -5.0));
 }
