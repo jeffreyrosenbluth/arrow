@@ -60,6 +60,18 @@ impl Surface {
 
 type Sdf = Box<dyn Fn(Vec3) -> Surface>;
 
+fn union(sdf1: Sdf, sdf2: Sdf) -> Sdf {
+    Box::new(move |p| sdf1(p).union(sdf2(p)))
+}
+
+fn intersect(sdf1: Sdf, sdf2: Sdf) -> Sdf {
+    Box::new(move |p| sdf1(p).intersect(sdf2(p)))
+}
+
+fn difference(sdf1: Sdf, sdf2: Sdf) -> Sdf {
+    Box::new(move |p| sdf1(p).difference(sdf2(p)))
+}
+
 fn reflect(i: Vec3, n: Vec3) -> Vec3 {
     i - n * 2.0 * i.dot(n)
 }
@@ -187,7 +199,7 @@ fn world() -> Sdf {
 
     fn silver(_: Vec3) -> Material {
         Material {
-            ambient: 0.7 * Vec3::new(0.2, 0.4, 0.4),
+            ambient: 0.8 * Vec3::new(0.2, 0.4, 0.4),
             diffuse: 0.7 * Vec3::new(0.2, 0.4, 0.4),
             specular: 0.1 * Vec3::new(1.0, 1.0, 1.0),
             shininess: 1.0,
@@ -211,10 +223,7 @@ fn world() -> Sdf {
     tr = tr * Affine3A::from_translation(Vec3::new(-1.0, 0.0, 0.0));
     let cube = sd_box(v3(0.6), tr, silver);
 
-    Box::new(move |q| {
-        let ball = cube(q).difference(sphere_black(q));
-        floor(q).union(sphere_gold(q)).union(ball)
-    })
+    union(union(floor, sphere_gold), difference(cube, sphere_black))
 }
 
 fn main() {
