@@ -6,9 +6,9 @@ pub fn sd_sphere(radius: f32, center: Vec3, material: MaterialFn) -> Sdf {
     Box::new(move |p| Surface::new((p - center).length() - radius, material.clone()))
 }
 
-pub fn sd_box(b: Vec3, transform: Affine3A, material: MaterialFn) -> Sdf {
+pub fn sd_box(b: Vec3, center: Vec3, transform: Affine3A, material: MaterialFn) -> Sdf {
     Box::new(move |p| {
-        let p = transform.transform_point3(p);
+        let p = transform.transform_point3(p - center);
         let q = p.abs() - b;
         Surface::new(
             q.y.max(q.z).max(q.x).min(0.0) + q.max(Vec3::ZERO).length(),
@@ -17,9 +17,15 @@ pub fn sd_box(b: Vec3, transform: Affine3A, material: MaterialFn) -> Sdf {
     })
 }
 
-pub fn sd_round_box(b: Vec3, radius: f32, transform: Affine3A, material: MaterialFn) -> Sdf {
+pub fn sd_round_box(
+    b: Vec3,
+    radius: f32,
+    center: Vec3,
+    transform: Affine3A,
+    material: MaterialFn,
+) -> Sdf {
     Box::new(move |p| {
-        let p = transform.transform_point3(p);
+        let p = transform.transform_point3(p - center);
         let q = p.abs() - b;
         Surface::new(
             q.x.max(q.y).max(q.z).min(0.0) + q.max(Vec3::ZERO).length() - radius,

@@ -50,8 +50,7 @@ fn world() -> Sdf {
 
     let mut tr = Affine3A::from_rotation_y(-0.4);
     tr = tr * Affine3A::from_rotation_x(0.35);
-    tr = tr * Affine3A::from_translation(Vec3::new(-1.0, 0.0, 0.0));
-    let cube = sd_round_box(v3(0.6), 0.05, tr, teal);
+    let cube = sd_round_box(v3(0.6), 0.05, Vec3::new(1.0, 0.0, 0.0), tr, teal);
 
     let tr = Affine3A::from_rotation_x(0.5);
     let torus = sd_torus(0.6, 0.2, v3(0.0), tr, red);
