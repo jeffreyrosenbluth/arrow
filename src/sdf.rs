@@ -47,3 +47,20 @@ pub fn sd_torus(
         Surface::new(q.length() - radius2, material.clone())
     })
 }
+
+pub fn sd_capsule(
+    radius: f32,
+    center: Vec3,
+    a: Vec3,
+    b: Vec3,
+    transform: Affine3A,
+    material: MaterialFn,
+) -> Sdf {
+    Box::new(move |p| {
+        let p = transform.transform_point3(p - center);
+        let pa = p - a;
+        let ba = b - a;
+        let h = (pa.dot(ba) / ba.dot(ba)).clamp(0.0, 1.0);
+        Surface::new((pa - ba * h).length() - radius, material.clone())
+    })
+}

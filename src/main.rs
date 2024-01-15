@@ -56,8 +56,18 @@ fn world() -> Sdf {
     let torus = sd_torus(0.6, 0.2, v3(0.0), tr, red);
 
     union(
-        union(union(floor, sphere_gold), difference(cube, sphere_red)),
-        torus,
+        union(
+            union(union(floor, sphere_gold), difference(cube, sphere_red)),
+            torus,
+        ),
+        sd_capsule(
+            0.25,
+            Vec3::new(0.0, 1.7, 0.0),
+            Vec3::new(-1.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Affine3A::IDENTITY,
+            teal,
+        ),
     )
 }
 
