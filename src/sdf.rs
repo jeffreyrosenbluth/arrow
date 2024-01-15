@@ -2,8 +2,13 @@ use crate::core::{MaterialFn, Sdf, Surface};
 use glam::Vec3Swizzles;
 use glam::{Affine3A, Vec2, Vec3};
 
-pub fn sd_sphere(radius: f32, center: Vec3, material: MaterialFn) -> Sdf {
-    Box::new(move |p| Surface::new((p - center).length() - radius, material.clone()))
+pub fn sd_sphere(radius: f32, center: Vec3, transform: Affine3A, material: MaterialFn) -> Sdf {
+    Box::new(move |p| {
+        Surface::new(
+            transform.transform_point3(p - center).length() - radius,
+            material.clone(),
+        )
+    })
 }
 
 pub fn sd_box(b: Vec3, center: Vec3, transform: Affine3A, material: MaterialFn) -> Sdf {

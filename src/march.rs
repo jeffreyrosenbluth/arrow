@@ -1,4 +1,4 @@
-use crate::core::{Material, Sdf};
+use crate::core::{Light, Material, Sdf};
 use glam::{Mat3, Vec3};
 
 const HIT_DIST: f32 = 0.001;
@@ -55,7 +55,7 @@ fn softshadow(sdf: &Sdf, ro: Vec3, rd: Vec3, mint: f32, maxt: f32, k: f32) -> f3
     return res.clamp(0.0, 1.0);
 }
 
-fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, light_pos: Vec3, background: Vec3) -> Vec3 {
+fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Vec3) -> Vec3 {
     let mut total_dist = 0.0;
     for _ in 0..MAX_STEPS {
         let p = ro + rd * total_dist;
@@ -63,8 +63,15 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, light_pos: Vec3, background: Vec3) -> Ve
         if dist < HIT_DIST {
             let n = normal(p, &sdf);
             let material = sdf(p).material;
-            return phong((light_pos - p).normalize(), n, rd, &material(p))
-                * softshadow(sdf, p, (light_pos - p).normalize(), 0.1, 1.0, 2.0);
+            let mut col = Vec3::ZERO;
+            lights.iter().for_each(|light| {
+                col += light.intensity
+                    * phong((light.position - p).normalize(), n, rd, &material(p))
+                    * softshadow(sdf, p, (light.position - p).normalize(), 0.1, 1.0, 2.0);
+            });
+            // return phong((lights - p).normalize(), n, rd, &material(p))
+            //     * softshadow(sdf, p, (lights - p).normalize(), 0.1, 1.0, 2.0);
+            return col;
         }
         if total_dist > MAX_DIST {
             break;
@@ -77,12 +84,13 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, light_pos: Vec3, background: Vec3) -> Ve
 pub fn render(
     sdf: &Sdf,
     dist_to_camera: f32,
-    light_pos: Vec3,
+    lights: &[Light],
     background: Vec3,
     width: u32,
     height: u32,
 ) -> Vec<u8> {
     let ro = Vec3::new(0.0, 0.0, -dist_to_camera);
+    let cam_mat = camera(ro, Vec3::ZERO);
     let mut img_data = vec![0; (width * height * 3) as usize];
     for y in 0..height {
         for x in 0..width {
@@ -91,9 +99,8 @@ pub fn render(
                 (height as f32 - y as f32) / (height as f32), // flip y
                 0.0,
             );
-            let rd = camera(ro, Vec3::ZERO)
-                * Vec3::new(uv.x * 2.0 - 1.0, uv.y * 2.0 - 1.0, 1.0).normalize();
-            let col = march(sdf, ro, rd, light_pos, background).powf(GAMMA_CORRECTION);
+            let rd = cam_mat * Vec3::new(uv.x * 2.0 - 1.0, uv.y * 2.0 - 1.0, 1.0).normalize();
+            let col = march(sdf, ro, rd, lights, background).powf(GAMMA_CORRECTION);
             let offset = ((y * width + x) * 3) as usize;
             img_data[offset + 0] = (col.x * 255.0) as u8;
             img_data[offset + 1] = (col.y * 255.0) as u8;

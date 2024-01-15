@@ -29,6 +29,10 @@ fn world() -> Sdf {
         Material::color(Vec3::new(0.2, 0.4, 0.4), 1.0)
     }
 
+    fn magenta(_: Vec3) -> Material {
+        Material::color(Vec3::new(0.5, 0.0, 0.5), 20.0)
+    }
+
     fn checkerboard(p: Vec3) -> Material {
         Material {
             ambient: v3(modulus(1.0 + 0.7 * (p.x.floor() + p.z.floor()), 2.0) * 0.3),
@@ -44,10 +48,10 @@ fn world() -> Sdf {
     }
 
     let sphere_gold = perturb(
-        sd_sphere(1.0, Vec3::new(-1.0, 0.0, 0.0), gold),
+        sd_sphere(1.0, Vec3::new(-1.0, 0.0, 0.0), I, gold),
         displacement,
     );
-    let sphere_red = sd_sphere(0.75, Vec3::new(1.0, 0.0, 0.0), rust);
+    let sphere_red = sd_sphere(0.75, Vec3::new(1.0, 0.0, 0.0), I, rust);
     let floor = Box::new(move |p: Vec3| Surface::new(p.y + 1.0, checkerboard));
 
     let mut tr = Affine3A::from_rotation_y(-0.4);
@@ -62,13 +66,25 @@ fn world() -> Sdf {
         Vec3::new(0.0, 1.7, 0.0),
         Vec3::new(-1.0, 0.0, 0.0),
         Vec3::new(1.0, 0.0, 0.0),
-        Affine3A::IDENTITY,
+        I,
         teal,
     );
 
+    let mut balls = Vec::new();
+    for i in 0..10 {
+        balls.push(sd_sphere(
+            0.07,
+            Vec3::new(-0.9 + i as f32 * 0.2, -0.9, -1.5),
+            I,
+            magenta,
+        ));
+    }
+
     let frame = difference(cube, sphere_red);
 
-    unions(vec![sphere_gold, floor, torus, capsule, frame])
+    let a = unions(vec![sphere_gold, floor, torus, capsule, frame]);
+    let b = unions(balls);
+    union(a, b)
 }
 
 fn main() {
@@ -76,7 +92,10 @@ fn main() {
     let img_data = render(
         &world(),
         3.0,
-        Vec3::new(8.0, 6.0, -5.0),
+        &vec![
+            Light::new(Vec3::new(-6.0, 6.0, -6.0), 0.8),
+            Light::new(Vec3::new(0.0, 0.0, -6.0), 0.2),
+        ],
         background,
         WIDTH,
         HEIGHT,
