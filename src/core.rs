@@ -77,3 +77,13 @@ pub fn perturb(sdf: Sdf, f: fn(Vec3) -> f32) -> Sdf {
         Surface::new(sd + f(p), material)
     })
 }
+
+pub fn unions(sdfs: Vec<Sdf>) -> Sdf {
+    sdfs.into_iter().reduce(|acc, sdf| union(acc, sdf)).unwrap()
+}
+
+pub fn intersects(sdfs: Vec<Sdf>) -> Sdf {
+    sdfs.into_iter()
+        .reduce(|acc, sdf| intersect(acc, sdf))
+        .unwrap()
+}

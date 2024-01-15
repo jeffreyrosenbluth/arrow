@@ -1,3 +1,5 @@
+use std::vec;
+
 use arrow::core::*;
 use arrow::march::render;
 use arrow::sdf::*;
@@ -55,20 +57,18 @@ fn world() -> Sdf {
     let tr = Affine3A::from_rotation_x(0.5);
     let torus = sd_torus(0.6, 0.2, v3(0.0), tr, red);
 
-    union(
-        union(
-            union(union(floor, sphere_gold), difference(cube, sphere_red)),
-            torus,
-        ),
-        sd_capsule(
-            0.25,
-            Vec3::new(0.0, 1.7, 0.0),
-            Vec3::new(-1.0, 0.0, 0.0),
-            Vec3::new(1.0, 0.0, 0.0),
-            Affine3A::IDENTITY,
-            teal,
-        ),
-    )
+    let capsule = sd_capsule(
+        0.25,
+        Vec3::new(0.0, 1.7, 0.0),
+        Vec3::new(-1.0, 0.0, 0.0),
+        Vec3::new(1.0, 0.0, 0.0),
+        Affine3A::IDENTITY,
+        teal,
+    );
+
+    let frame = difference(cube, sphere_red);
+
+    unions(vec![sphere_gold, floor, torus, capsule, frame])
 }
 
 fn main() {
