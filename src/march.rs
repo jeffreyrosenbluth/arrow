@@ -4,7 +4,7 @@ use glam::{Mat3, Vec3};
 const MAX_STEPS: u32 = 512;
 const MAX_DIST: f32 = 100.0;
 const EPSILON: f32 = 0.0001;
-const GAMMA_CORRECTION: f32 = 0.4545;
+const GAMMA_CORRECTION: f32 = 1.0; //0.4545;
 
 fn reflect(i: Vec3, n: Vec3) -> Vec3 {
     i - n * 2.0 * i.dot(n)
@@ -54,6 +54,21 @@ fn softshadow(sdf: &Sdf, ro: Vec3, rd: Vec3, mint: f32, maxt: f32, k: f32) -> f3
     return res.clamp(0.0, 1.0);
 }
 
+fn ambient_occlusion(sdf: &Sdf, p: Vec3, n: Vec3) -> f32 {
+    let mut occ: f32 = 0.0;
+    let mut w: f32 = 1.0;
+    for i in 0..5 {
+        let h = 0.01 + 0.12 * i as f32 / 4.0;
+        let d = sdf(p + n * h).sd;
+        occ += (h - d) * w;
+        w *= 0.95;
+        if occ > 0.35 {
+            break;
+        }
+    }
+    (1.0 - 3.0 * occ).clamp(0.0, 1.0)
+}
+
 fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Vec3) -> Vec3 {
     let mut total_dist = 0.0;
     for _ in 0..MAX_STEPS {
@@ -66,7 +81,8 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Vec3) -> V
             lights.iter().for_each(|light| {
                 col += light.intensity
                     * phong((light.position - p).normalize(), n, rd, &material(p))
-                    * softshadow(sdf, p, (light.position - p).normalize(), 0.1, 1.0, 2.0);
+                    * softshadow(sdf, p, (light.position - p).normalize(), 0.1, 1.0, 2.0)
+                    * ambient_occlusion(sdf, p, n);
             });
             return col;
         }
@@ -77,16 +93,7 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Vec3) -> V
     }
     return background;
 }
-// #if AA>1
-//     for( int m=ZERO; m<AA; m++ )
-//     for( int n=ZERO; n<AA; n++ )
-//     {
-//         // pixel coordinates
-//         vec2 o = vec2(float(m),float(n)) / float(AA) - 0.5;
-//         vec2 p = (2.0*(fragCoord+o)-iResolution.xy)/iResolution.y;
-// #else
-//         vec2 p = (2.0*fragCoord-iResolution.xy)/iResolution.y;
-// #endif
+
 pub fn render(
     sdf: &Sdf,
     dist_to_camera: f32,
@@ -104,16 +111,20 @@ pub fn render(
             let mut col = Vec3::ZERO;
             for m in 0..anti_aliasing {
                 for n in 0..anti_aliasing {
-                    let ox = (m as f32) / ((height * anti_aliasing) as f32) - (0.5 / height as f32);
-                    let oy = (n as f32) / ((height * anti_aliasing) as f32) - (0.5 / height as f32);
+                    let ox = (m as f32) / (anti_aliasing as f32) - 0.5;
+                    let oy = (n as f32) / (anti_aliasing as f32) - 0.5;
                     let uv = Vec3::new(
                         (x as f32) / (height as f32),
                         (height as f32 - y as f32) / (height as f32), // flip y
                         0.0,
                     );
                     let rd = cam_mat
-                        * Vec3::new((uv.x + ox) * 2.0 - 1.0, (uv.y + oy) * 2.0 - 1.0, 1.0)
-                            .normalize();
+                        * Vec3::new(
+                            (uv.x + ox / height as f32) * 2.0 - 1.0,
+                            (uv.y + oy / height as f32) * 2.0 - 1.0,
+                            1.0,
+                        )
+                        .normalize();
                     col += march(sdf, ro, rd, lights, background).powf(GAMMA_CORRECTION);
                 }
             }

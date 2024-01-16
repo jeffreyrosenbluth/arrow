@@ -5,8 +5,8 @@ use arrow::march::render;
 use arrow::sdf::*;
 use glam::{Affine3A, Vec3};
 
-const WIDTH: u32 = 1024;
-const HEIGHT: u32 = 1024;
+const WIDTH: u32 = 512;
+const HEIGHT: u32 = 512;
 
 fn modulus(a: f32, b: f32) -> f32 {
     ((a % b) + b) % b
@@ -76,7 +76,7 @@ fn world() -> Sdf {
 
     let rounded_cube = round(
         sd_box(
-            Vec3::new(0.2, 0.2, 0.1),
+            Vec3::new(0.2, 0.2, 0.0),
             Vec3::new(-1.9, 1.9, 0.0),
             I,
             green,
@@ -109,7 +109,7 @@ fn world() -> Sdf {
 }
 
 fn main() {
-    let background = Vec3::new(0.0, 0.0, 0.1);
+    let background = Vec3::new(0.0, 0.0, 0.2);
     let img_data = render(
         &world(),
         3.0,
@@ -120,7 +120,7 @@ fn main() {
         background,
         WIDTH,
         HEIGHT,
-        1,
+        2,
     );
-    image::save_buffer("out.png", &img_data, WIDTH, HEIGHT, image::ColorType::Rgb8).unwrap();
+    image::save_buffer("out1.png", &img_data, WIDTH, HEIGHT, image::ColorType::Rgb8).unwrap();
 }
