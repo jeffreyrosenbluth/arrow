@@ -29,6 +29,10 @@ fn world() -> Sdf {
         Material::color(Vec3::new(0.2, 0.4, 0.4), 1.0)
     }
 
+    fn green(_: Vec3) -> Material {
+        Material::color(Vec3::new(0.5, 1.0, 0.1), 1.0)
+    }
+
     fn magenta(_: Vec3) -> Material {
         Material::color(Vec3::new(0.5, 0.0, 0.5), 20.0)
     }
@@ -59,7 +63,7 @@ fn world() -> Sdf {
     let cube = sd_round_box(v3(0.6), 0.05, Vec3::new(1.0, 0.0, 0.0), tr, teal);
 
     let tr = Affine3A::from_rotation_x(0.5);
-    let torus = sd_torus(0.6, 0.2, v3(0.0), tr, red);
+    let torus = sd_torus(0.6, 0.2, Vec3::new(0.1, 0.0, -0.2), tr, red);
 
     let capsule = sd_capsule(
         0.25,
@@ -68,6 +72,16 @@ fn world() -> Sdf {
         Vec3::new(1.0, 0.0, 0.0),
         I,
         teal,
+    );
+
+    let rounded_cube = round(
+        sd_box(
+            Vec3::new(0.2, 0.2, 0.1),
+            Vec3::new(-1.9, 1.9, 0.0),
+            I,
+            green,
+        ),
+        0.2,
     );
 
     let mut balls = Vec::new();
@@ -82,7 +96,14 @@ fn world() -> Sdf {
 
     let frame = difference(cube, sphere_red);
 
-    let a = unions(vec![sphere_gold, floor, torus, capsule, frame]);
+    let a = unions(vec![
+        sphere_gold,
+        floor,
+        torus,
+        capsule,
+        frame,
+        rounded_cube,
+    ]);
     let b = unions(balls);
     union(a, b)
 }
@@ -99,6 +120,7 @@ fn main() {
         background,
         WIDTH,
         HEIGHT,
+        1,
     );
     image::save_buffer("out.png", &img_data, WIDTH, HEIGHT, image::ColorType::Rgb8).unwrap();
 }

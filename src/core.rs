@@ -94,6 +94,13 @@ pub fn perturb(sdf: Sdf, f: fn(Vec3) -> f32) -> Sdf {
     })
 }
 
+pub fn round(sdf: Sdf, radius: f32) -> Sdf {
+    Box::new(move |p| {
+        let Surface { sd, material } = sdf(p);
+        Surface::new(sd - radius, material)
+    })
+}
+
 pub fn unions(sdfs: Vec<Sdf>) -> Sdf {
     sdfs.into_iter().reduce(|acc, sdf| union(acc, sdf)).unwrap()
 }
