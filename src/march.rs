@@ -1,5 +1,6 @@
 use crate::core::{Light, Material, Sdf};
 use glam::{Mat3, Vec3};
+use rayon::prelude::*;
 
 const MAX_STEPS: u32 = 512;
 const MAX_DIST: f32 = 100.0;
@@ -58,7 +59,7 @@ fn ambient_occlusion(sdf: &Sdf, p: Vec3, n: Vec3) -> f32 {
     let mut occ: f32 = 0.0;
     let mut w: f32 = 1.0;
     for i in 0..5 {
-        let h = 0.01 + 0.12 * i as f32 / 4.0;
+        let h = 0.01 + 0.03 * i as f32;
         let d = sdf(p + n * h).sd;
         occ += (h - d) * w;
         w *= 0.95;
@@ -105,34 +106,39 @@ pub fn render(
 ) -> Vec<u8> {
     let ro = Vec3::new(0.0, 0.0, -dist_to_camera);
     let cam_mat = camera(ro, Vec3::ZERO);
-    let mut img_data = vec![0; (width * height * 3) as usize];
+    let mut img_data: Vec<u8> = Vec::with_capacity((3 * width * height) as usize);
     for y in 0..height {
-        for x in 0..width {
-            let mut col = Vec3::ZERO;
-            for m in 0..anti_aliasing {
-                for n in 0..anti_aliasing {
-                    let ox = (m as f32) / (anti_aliasing as f32) - 0.5;
-                    let oy = (n as f32) / (anti_aliasing as f32) - 0.5;
-                    let uv = Vec3::new(
-                        (x as f32) / (height as f32),
-                        (height as f32 - y as f32) / (height as f32), // flip y
-                        0.0,
-                    );
-                    let rd = cam_mat
-                        * Vec3::new(
-                            (uv.x + ox / height as f32) * 2.0 - 1.0,
-                            (uv.y + oy / height as f32) * 2.0 - 1.0,
-                            1.0,
-                        )
-                        .normalize();
-                    col += march(sdf, ro, rd, lights, background).powf(GAMMA_CORRECTION);
+        let scanline: Vec<Vec3> = (0..width)
+            .into_par_iter()
+            .map(|x| {
+                let mut col = Vec3::ZERO;
+                for m in 0..anti_aliasing {
+                    for n in 0..anti_aliasing {
+                        let ox = (m as f32) / (anti_aliasing as f32) - 0.5;
+                        let oy = (n as f32) / (anti_aliasing as f32) - 0.5;
+                        let uv = Vec3::new(
+                            (x as f32) / (height as f32),
+                            (height as f32 - y as f32) / (height as f32), // flip y
+                            0.0,
+                        );
+                        let rd = cam_mat
+                            * Vec3::new(
+                                (uv.x + ox / height as f32) * 2.0 - 1.0,
+                                (uv.y + oy / height as f32) * 2.0 - 1.0,
+                                1.0,
+                            )
+                            .normalize();
+                        col += march(sdf, ro, rd, lights, background).powf(GAMMA_CORRECTION);
+                    }
                 }
-            }
-            col /= (anti_aliasing * anti_aliasing) as f32;
-            let offset = ((y * width + x) * 3) as usize;
-            img_data[offset + 0] = (col.x * 255.0) as u8;
-            img_data[offset + 1] = (col.y * 255.0) as u8;
-            img_data[offset + 2] = (col.z * 255.0) as u8;
+                col /= (anti_aliasing * anti_aliasing) as f32;
+                col
+            })
+            .collect();
+        for col in scanline {
+            img_data.push((col.x * 255.0) as u8);
+            img_data.push((col.y * 255.0) as u8);
+            img_data.push((col.z * 255.0) as u8);
         }
     }
     img_data

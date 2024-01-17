@@ -73,7 +73,7 @@ impl Surface {
     }
 }
 
-pub type Sdf = Box<dyn Fn(Vec3) -> Surface>;
+pub type Sdf = Box<dyn Fn(Vec3) -> Surface + Sync>;
 
 pub fn union(sdf1: Sdf, sdf2: Sdf) -> Sdf {
     Box::new(move |p| sdf1(p).union(sdf2(p)))

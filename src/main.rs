@@ -5,8 +5,8 @@ use arrow::march::render;
 use arrow::sdf::*;
 use glam::{Affine3A, Vec3};
 
-const WIDTH: u32 = 512;
-const HEIGHT: u32 = 512;
+const WIDTH: u32 = 1024;
+const HEIGHT: u32 = 1024;
 
 fn modulus(a: f32, b: f32) -> f32 {
     ((a % b) + b) % b
@@ -122,5 +122,5 @@ fn main() {
         HEIGHT,
         2,
     );
-    image::save_buffer("out1.png", &img_data, WIDTH, HEIGHT, image::ColorType::Rgb8).unwrap();
+    image::save_buffer("out.png", &img_data, WIDTH, HEIGHT, image::ColorType::Rgb8).unwrap();
 }
