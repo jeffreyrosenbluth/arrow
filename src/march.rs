@@ -74,14 +74,15 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Vec3) -> V
     let mut total_dist = 0.0;
     for _ in 0..MAX_STEPS {
         let p = ro + rd * total_dist;
-        let dist = sdf(p).sd;
+        let surface = sdf(p);
+        let dist = surface.sd;
         if dist.abs() < EPSILON {
             let n = normal(p, &sdf);
-            let material = sdf(p).material;
+            let material = surface.material;
             let mut col = Vec3::ZERO;
             lights.iter().for_each(|light| {
                 col += light.intensity
-                    * phong((light.position - p).normalize(), n, rd, &material(p))
+                    * phong((light.position - p).normalize(), n, rd, &material)
                     * softshadow(sdf, p, (light.position - p).normalize(), 0.1, 1.0, 2.0)
                     * ambient_occlusion(sdf, p, n);
             });

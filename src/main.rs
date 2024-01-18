@@ -3,7 +3,7 @@ use std::vec;
 use arrow::core::*;
 use arrow::march::render;
 use arrow::sdf::*;
-use glam::{Affine3A, Vec3};
+use glam::{Affine2, Affine3A, Vec2, Vec3, Vec3Swizzles};
 
 const WIDTH: u32 = 1024;
 const HEIGHT: u32 = 1024;
@@ -128,6 +128,32 @@ fn scene0() -> Sdf {
 fn scene1() -> Sdf {
     let plane = sd_plane(Vec3::new(0.05, 1.0, 0.0), I, slate);
     union(plane, sd_sphere(1.0, Vec3::new(0.0, 0.0, 0.0), I, gold))
+}
+
+#[allow(dead_code)]
+fn scene2(t: f32) -> Sdf {
+    fn rot(a: f32) -> Affine2 {
+        Affine2::from_angle(a)
+    }
+    fn g(p: Vec3) -> f32 {
+        let s = Vec3::new(p.y.sin(), p.z.sin(), p.x.sin());
+        let c = Vec3::new(p.z.cos(), p.x.cos(), p.y.cos());
+        c.dot(s)
+    }
+    Box::new(move |p| {
+        let mut q = p;
+        let xz = rot(t).transform_point2(q.xz());
+        q.x = xz.x;
+        q.z = xz.y;
+        let xy = rot(0.3).transform_point2(q.xy());
+        q.x = xy.x - 0.5;
+        q.y = xy.y - 0.5;
+        let mut d = (-(Vec2::new(q.y, q.xz().length() - 2.0)).length() - 1.8 + t.cos() * 0.3).abs();
+        let h = g(p.yxz() * 4.0) / 4.0;
+        d = Vec2::new(d, h).length() - 0.3;
+        let c = Material::color(v3(h), 1.0);
+        Surface::new(d, c)
+    })
 }
 
 fn main() {

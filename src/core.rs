@@ -43,11 +43,11 @@ pub type MaterialFn = fn(Vec3) -> Material;
 
 pub struct Surface {
     pub sd: f32,
-    pub material: MaterialFn,
+    pub material: Material,
 }
 
 impl Surface {
-    pub fn new(sd: f32, material: MaterialFn) -> Self {
+    pub fn new(sd: f32, material: Material) -> Self {
         Self { sd, material }
     }
 
