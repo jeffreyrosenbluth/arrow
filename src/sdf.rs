@@ -2,10 +2,10 @@ use crate::core::{MaterialFn, Sdf, Surface};
 use glam::Vec3Swizzles;
 use glam::{Affine3A, Vec2, Vec3};
 
-pub fn sd_plane(normal: Vec3, offset: f32, transform: Affine3A, material: MaterialFn) -> Sdf {
+pub fn sd_plane(normal: Vec3, transform: Affine3A, material: MaterialFn) -> Sdf {
     Box::new(move |p| {
         let p = transform.transform_point3(p);
-        Surface::new(normal.dot(p) + offset, material.clone())
+        Surface::new(normal.dot(p) + 1.0, material.clone())
     })
 }
 
@@ -80,19 +80,27 @@ pub fn sd_capsule(
 pub fn sd_cylinder(
     radius: f32,
     center: Vec3,
-    a: Vec3,
-    b: Vec3,
+    bottom: Vec3,
+    top: Vec3,
     transform: Affine3A,
     material: MaterialFn,
 ) -> Sdf {
     Box::new(move |p| {
         let p = transform.transform_point3(p - center);
-        let pa = p - a;
-        let ba = b - a;
-        let h = (pa.dot(ba) / ba.dot(ba)).clamp(0.0, 1.0);
-        Surface::new(
-            (pa - ba * h).xz().length() + h * ba.y - radius,
-            material.clone(),
-        )
+        let pa = p - bottom;
+        let ba = top - bottom;
+        let baba = ba.dot(ba);
+        let paba = pa.dot(ba);
+        let x = (pa * baba - ba * paba).length() - radius * baba;
+        let y = (paba - baba * 0.5).abs() - baba * 0.5;
+        let x2 = x * x;
+        let y2 = y * y * baba;
+        let d = if x.max(y) < 0.0 {
+            -x2.min(y2)
+        } else {
+            (if x > 0.0 { x2 } else { 0.0 }) + (if y > 0.0 { y2 } else { 0.0 })
+        };
+        let d = d.signum() * d.abs().sqrt() / baba;
+        Surface::new(d, material.clone())
     })
 }

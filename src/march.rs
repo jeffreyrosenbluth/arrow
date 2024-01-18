@@ -75,7 +75,7 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Vec3) -> V
     for _ in 0..MAX_STEPS {
         let p = ro + rd * total_dist;
         let dist = sdf(p).sd;
-        if dist < EPSILON {
+        if dist.abs() < EPSILON {
             let n = normal(p, &sdf);
             let material = sdf(p).material;
             let mut col = Vec3::ZERO;
