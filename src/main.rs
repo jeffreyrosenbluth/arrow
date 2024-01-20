@@ -2,7 +2,7 @@ use std::vec;
 
 use arrow::core::*;
 use arrow::sdf::*;
-use arrow::{core::Light, march::render_stipple};
+use arrow::{core::Light, march::render};
 use glam::{Affine2, Affine3A, Vec2, Vec3, Vec3Swizzles};
 use wassily::prelude::*;
 
@@ -43,9 +43,7 @@ fn slate(_: Vec3) -> Material {
 
 fn checkerboard(p: Vec3) -> Material {
     Material {
-        ambient: grayscale(v3(
-            modulus(1.0 + 0.7 * (p.x.floor() + p.z.floor()), 2.0) * 0.3
-        )),
+        ambient: modulus(1.0 + 0.7 * (p.x.floor() + p.z.floor()), 2.0) * 0.3,
         diffuse: 0.3,
         specular: 0.0,
         shininess: 1.0,
@@ -65,7 +63,6 @@ fn scene0() -> Sdf {
     );
     let sphere_red = sd_sphere(0.75, Vec3::new(1.0, 0.0, 0.0), I, rust);
     let floor = sd_plane(Vec3::new(0.05, 1.0, 0.0), I, checkerboard);
-    // let floor = Box::new(move |p: Vec3| Surface::new(p.y + 1.0, checkerboard));
 
     let mut tr = Affine3A::from_rotation_y(-0.4);
     tr = tr * Affine3A::from_rotation_x(0.35);
@@ -162,7 +159,7 @@ fn scene2(t: f32) -> Sdf {
 
 fn main() {
     let background = 0.5;
-    let img_data = render_stipple(
+    let img_data = render(
         &scene0(),
         3.25,
         &vec![
@@ -176,19 +173,13 @@ fn main() {
     );
     let mut canvas = Canvas::new(WIDTH, HEIGHT);
     canvas.fill(*WHITE);
-    // let mut rng = SmallRng::from_entropy();
     for q in img_data {
-        let c = 3.5 * (1.0 - q.2).powf(1.5);
-        // let b = rng.gen_bool(c as f64);
-        // if b {
-        // canvas.dot(q.0, q.1, Color::from_rgba(0.0, 0.0, 0.0, 1.0).unwrap());
+        let radius = 3.5 * (1.0 - q.2).powf(1.5);
         Shape::new()
-            .circle(pt(q.0, q.1), c)
+            .circle(pt(q.0, q.1), radius)
             .fill_color(*BLACK)
             .no_stroke()
             .draw(&mut canvas);
-        // }
     }
     canvas.save_png("out.png");
-    // image::save_buffer("out.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
 }

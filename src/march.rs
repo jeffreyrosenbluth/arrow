@@ -6,7 +6,6 @@ use wassily::stipple::poisson_disk;
 const MAX_STEPS: u32 = 512;
 const MAX_DIST: f32 = 100.0;
 const EPSILON: f32 = 0.0001;
-const GAMMA_CORRECTION: f32 = 1.0; //0.4545;
 
 fn reflect(i: Vec3, n: Vec3) -> Vec3 {
     i - n * 2.0 * i.dot(n)
@@ -97,7 +96,7 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: f32) -> f3
     return background;
 }
 
-pub fn render_stipple(
+pub fn render(
     sdf: &Sdf,
     dist_to_camera: f32,
     lights: &[Light],
@@ -108,12 +107,8 @@ pub fn render_stipple(
 ) -> Vec<(f32, f32, f32)> {
     let ro = Vec3::new(0.0, 0.0, -dist_to_camera);
     let cam_mat = camera(ro, Vec3::ZERO);
-    // let mut img_data: Vec<(f32, f32, f32)> = Vec::with_capacity((width * height) as usize);
     let pts = poisson_disk(width as f32, height as f32, 3.0, 0);
     let img_data = pts.into_par_iter().map(|p| {
-        // for p in pts {
-        // for y in 0..height {
-        //     for x in 0..width {
         let mut col = 0.0;
         for m in 0..anti_aliasing {
             for n in 0..anti_aliasing {
@@ -131,12 +126,11 @@ pub fn render_stipple(
                         1.0,
                     )
                     .normalize();
-                col += march(sdf, ro, rd, lights, background).powf(GAMMA_CORRECTION);
+                col += march(sdf, ro, rd, lights, background);
             }
         }
         col /= (anti_aliasing * anti_aliasing) as f32;
         (p.x, p.y, col)
-        // img_data.push((p.x, p.y, col))
     });
     // }
     img_data.collect()
