@@ -11,7 +11,7 @@ fn reflect(i: Vec3, n: Vec3) -> Vec3 {
     i - n * 2.0 * i.dot(n)
 }
 
-fn phong(light_dir: Vec3, normal: Vec3, rd: Vec3, material: &Material) -> Vec3 {
+fn phong(light_dir: Vec3, normal: Vec3, rd: Vec3, material: &Material) -> f32 {
     let ambient = material.ambient;
     let diffuse = material.diffuse * normal.dot(light_dir).clamp(0.0, 1.0);
     let specular = material.specular
@@ -70,7 +70,7 @@ fn ambient_occlusion(sdf: &Sdf, p: Vec3, n: Vec3) -> f32 {
     (1.0 - 3.0 * occ).clamp(0.0, 1.0)
 }
 
-fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Vec3) -> Vec3 {
+fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: f32) -> f32 {
     let mut total_dist = 0.0;
     for _ in 0..MAX_STEPS {
         let p = ro + rd * total_dist;
@@ -79,7 +79,7 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Vec3) -> V
         if dist.abs() < EPSILON {
             let n = normal(p, &sdf);
             let material = surface.material;
-            let mut col = Vec3::ZERO;
+            let mut col = 0.0;
             lights.iter().for_each(|light| {
                 col += light.intensity
                     * phong((light.position - p).normalize(), n, rd, &material)
@@ -100,19 +100,19 @@ pub fn render(
     sdf: &Sdf,
     dist_to_camera: f32,
     lights: &[Light],
-    background: Vec3,
+    background: f32,
     width: u32,
     height: u32,
     anti_aliasing: u32,
 ) -> Vec<u8> {
     let ro = Vec3::new(0.0, 0.0, -dist_to_camera);
     let cam_mat = camera(ro, Vec3::ZERO);
-    let mut img_data: Vec<u8> = Vec::with_capacity((3 * width * height) as usize);
+    let mut img_data: Vec<u8> = Vec::with_capacity((width * height) as usize);
     for y in 0..height {
-        let scanline: Vec<Vec3> = (0..width)
+        let scanline: Vec<f32> = (0..width)
             .into_par_iter()
             .map(|x| {
-                let mut col = Vec3::ZERO;
+                let mut col = 0.0;
                 for m in 0..anti_aliasing {
                     for n in 0..anti_aliasing {
                         let ox = (m as f32) / (anti_aliasing as f32) - 0.5;
@@ -137,10 +137,8 @@ pub fn render(
             })
             .collect();
         for col in scanline {
-            let col = crate::core::grayscale(col);
-            img_data.push((col.x * 255.0) as u8);
-            img_data.push((col.y * 255.0) as u8);
-            img_data.push((col.z * 255.0) as u8);
+            // let col = crate::core::grayscale(col);
+            img_data.push((col * 255.0) as u8);
         }
     }
     img_data

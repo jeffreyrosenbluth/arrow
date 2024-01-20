@@ -22,18 +22,18 @@ impl Light {
 
 #[derive(Clone, Copy)]
 pub struct Material {
-    pub ambient: Vec3,
-    pub diffuse: Vec3,
-    pub specular: Vec3,
+    pub ambient: f32,
+    pub diffuse: f32,
+    pub specular: f32,
     pub shininess: f32,
 }
 
 impl Material {
     pub fn color(c: Vec3, shininess: f32) -> Self {
         Self {
-            ambient: 0.5 * c,
-            diffuse: 0.5 * c,
-            specular: 0.5 * v3(1.0),
+            ambient: 0.5 * grayscale(c),
+            diffuse: 0.5 * grayscale(c),
+            specular: 0.5,
             shininess,
         }
     }
@@ -41,9 +41,8 @@ impl Material {
 
 pub type MaterialFn = fn(Vec3) -> Material;
 
-pub fn grayscale(color: Vec3) -> Vec3 {
-    let c = 0.2989 * color[0] + 0.5870 * color[1] + 0.1140 * color[2];
-    v3(c)
+pub fn grayscale(color: Vec3) -> f32 {
+    0.2989 * color[0] + 0.5870 * color[1] + 0.1140 * color[2]
 }
 
 pub struct Surface {

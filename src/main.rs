@@ -1,9 +1,11 @@
 use std::vec;
 
+use arrow::core::Light;
 use arrow::core::*;
 use arrow::march::render;
 use arrow::sdf::*;
 use glam::{Affine2, Affine3A, Vec2, Vec3, Vec3Swizzles};
+use wassily::prelude::*;
 
 const WIDTH: u32 = 1024;
 const HEIGHT: u32 = 1024;
@@ -42,9 +44,11 @@ fn slate(_: Vec3) -> Material {
 
 fn checkerboard(p: Vec3) -> Material {
     Material {
-        ambient: v3(modulus(1.0 + 0.7 * (p.x.floor() + p.z.floor()), 2.0) * 0.3),
-        diffuse: v3(0.3),
-        specular: Vec3::ZERO,
+        ambient: grayscale(v3(
+            modulus(1.0 + 0.7 * (p.x.floor() + p.z.floor()), 2.0) * 0.3
+        )),
+        diffuse: 0.3,
+        specular: 0.0,
         shininess: 1.0,
     }
 }
@@ -158,7 +162,7 @@ fn scene2(t: f32) -> Sdf {
 }
 
 fn main() {
-    let background = Vec3::new(0.0, 0.0, 0.2);
+    let background = grayscale(Vec3::new(0.0, 0.0, 0.2));
     let img_data = render(
         &scene0(),
         3.25,
@@ -171,5 +175,5 @@ fn main() {
         HEIGHT,
         2,
     );
-    image::save_buffer("out.png", &img_data, WIDTH, HEIGHT, image::ColorType::Rgb8).unwrap();
+    image::save_buffer("out.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
 }
