@@ -41,6 +41,11 @@ impl Material {
 
 pub type MaterialFn = fn(Vec3) -> Material;
 
+pub fn grayscale(color: Vec3) -> Vec3 {
+    let c = 0.2989 * color[0] + 0.5870 * color[1] + 0.1140 * color[2];
+    v3(c)
+}
+
 pub struct Surface {
     pub sd: f32,
     pub material: Material,

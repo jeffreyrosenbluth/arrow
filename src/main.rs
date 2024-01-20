@@ -130,6 +130,7 @@ fn scene1() -> Sdf {
     union(plane, sd_sphere(1.0, Vec3::new(0.0, 0.0, 0.0), I, gold))
 }
 
+// Not working yet, needs to implement the shade function: https://www.shadertoy.com/view/XcS3zK
 #[allow(dead_code)]
 fn scene2(t: f32) -> Sdf {
     fn rot(a: f32) -> Affine2 {

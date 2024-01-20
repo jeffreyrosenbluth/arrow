@@ -137,6 +137,7 @@ pub fn render(
             })
             .collect();
         for col in scanline {
+            let col = crate::core::grayscale(col);
             img_data.push((col.x * 255.0) as u8);
             img_data.push((col.y * 255.0) as u8);
             img_data.push((col.z * 255.0) as u8);
