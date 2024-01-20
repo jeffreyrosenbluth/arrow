@@ -1,14 +1,13 @@
 use std::vec;
 
-use arrow::core::Light;
 use arrow::core::*;
-use arrow::march::render;
 use arrow::sdf::*;
+use arrow::{core::Light, march::render_stipple};
 use glam::{Affine2, Affine3A, Vec2, Vec3, Vec3Swizzles};
 use wassily::prelude::*;
 
-const WIDTH: u32 = 1024;
-const HEIGHT: u32 = 1024;
+const WIDTH: u32 = 2048;
+const HEIGHT: u32 = 2048;
 
 fn modulus(a: f32, b: f32) -> f32 {
     ((a % b) + b) % b
@@ -162,8 +161,8 @@ fn scene2(t: f32) -> Sdf {
 }
 
 fn main() {
-    let background = grayscale(Vec3::new(0.0, 0.0, 0.2));
-    let img_data = render(
+    let background = 0.5;
+    let img_data = render_stipple(
         &scene0(),
         3.25,
         &vec![
@@ -175,5 +174,21 @@ fn main() {
         HEIGHT,
         2,
     );
-    image::save_buffer("out.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
+    let mut canvas = Canvas::new(WIDTH, HEIGHT);
+    canvas.fill(*WHITE);
+    // let mut rng = SmallRng::from_entropy();
+    for q in img_data {
+        let c = 3.5 * (1.0 - q.2).powf(1.5);
+        // let b = rng.gen_bool(c as f64);
+        // if b {
+        // canvas.dot(q.0, q.1, Color::from_rgba(0.0, 0.0, 0.0, 1.0).unwrap());
+        Shape::new()
+            .circle(pt(q.0, q.1), c)
+            .fill_color(*BLACK)
+            .no_stroke()
+            .draw(&mut canvas);
+        // }
+    }
+    canvas.save_png("out.png");
+    // image::save_buffer("out.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
 }

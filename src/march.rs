@@ -1,6 +1,7 @@
 use crate::core::{Light, Material, Sdf};
 use glam::{Mat3, Vec3};
 use rayon::prelude::*;
+use wassily::stipple::poisson_disk;
 
 const MAX_STEPS: u32 = 512;
 const MAX_DIST: f32 = 100.0;
@@ -96,7 +97,7 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: f32) -> f3
     return background;
 }
 
-pub fn render(
+pub fn render_stipple(
     sdf: &Sdf,
     dist_to_camera: f32,
     lights: &[Light],
@@ -104,42 +105,39 @@ pub fn render(
     width: u32,
     height: u32,
     anti_aliasing: u32,
-) -> Vec<u8> {
+) -> Vec<(f32, f32, f32)> {
     let ro = Vec3::new(0.0, 0.0, -dist_to_camera);
     let cam_mat = camera(ro, Vec3::ZERO);
-    let mut img_data: Vec<u8> = Vec::with_capacity((width * height) as usize);
-    for y in 0..height {
-        let scanline: Vec<f32> = (0..width)
-            .into_par_iter()
-            .map(|x| {
-                let mut col = 0.0;
-                for m in 0..anti_aliasing {
-                    for n in 0..anti_aliasing {
-                        let ox = (m as f32) / (anti_aliasing as f32) - 0.5;
-                        let oy = (n as f32) / (anti_aliasing as f32) - 0.5;
-                        let uv = Vec3::new(
-                            (x as f32) / (height as f32),
-                            (height as f32 - y as f32) / (height as f32), // flip y
-                            0.0,
-                        );
-                        let rd = cam_mat
-                            * Vec3::new(
-                                (uv.x + ox / height as f32) * 2.0 - 1.0,
-                                (uv.y + oy / height as f32) * 2.0 - 1.0,
-                                1.0,
-                            )
-                            .normalize();
-                        col += march(sdf, ro, rd, lights, background).powf(GAMMA_CORRECTION);
-                    }
-                }
-                col /= (anti_aliasing * anti_aliasing) as f32;
-                col
-            })
-            .collect();
-        for col in scanline {
-            // let col = crate::core::grayscale(col);
-            img_data.push((col * 255.0) as u8);
+    // let mut img_data: Vec<(f32, f32, f32)> = Vec::with_capacity((width * height) as usize);
+    let pts = poisson_disk(width as f32, height as f32, 3.0, 0);
+    let img_data = pts.into_par_iter().map(|p| {
+        // for p in pts {
+        // for y in 0..height {
+        //     for x in 0..width {
+        let mut col = 0.0;
+        for m in 0..anti_aliasing {
+            for n in 0..anti_aliasing {
+                let ox = (m as f32) / (anti_aliasing as f32) - 0.5;
+                let oy = (n as f32) / (anti_aliasing as f32) - 0.5;
+                let uv = Vec3::new(
+                    (p.x as f32) / (height as f32),
+                    (height as f32 - p.y as f32) / (height as f32), // flip y
+                    0.0,
+                );
+                let rd = cam_mat
+                    * Vec3::new(
+                        (uv.x + ox / height as f32) * 2.0 - 1.0,
+                        (uv.y + oy / height as f32) * 2.0 - 1.0,
+                        1.0,
+                    )
+                    .normalize();
+                col += march(sdf, ro, rd, lights, background).powf(GAMMA_CORRECTION);
+            }
         }
-    }
-    img_data
+        col /= (anti_aliasing * anti_aliasing) as f32;
+        (p.x, p.y, col)
+        // img_data.push((p.x, p.y, col))
+    });
+    // }
+    img_data.collect()
 }
