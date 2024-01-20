@@ -178,7 +178,8 @@ fn main() {
         Shape::new()
             .circle(pt(q.0, q.1), radius)
             .fill_color(*BLACK)
-            .no_stroke()
+            .stroke_color(*WHITE)
+            // .no_stroke()
             .draw(&mut canvas);
     }
     canvas.save_png("out.png");
