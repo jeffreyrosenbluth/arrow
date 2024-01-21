@@ -132,6 +132,5 @@ pub fn render(
         col /= (anti_aliasing * anti_aliasing) as f32;
         (p.x, p.y, col)
     });
-    // }
     img_data.collect()
 }

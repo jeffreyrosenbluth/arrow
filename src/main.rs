@@ -34,7 +34,7 @@ fn green(_: Vec3) -> Material {
 }
 
 fn magenta(_: Vec3) -> Material {
-    Material::color(Vec3::new(0.5, 0.0, 0.5), 20.0)
+    Material::color(Vec3::new(0.75, 0.0, 0.75), 20.0)
 }
 
 fn slate(_: Vec3) -> Material {
@@ -163,8 +163,8 @@ fn main() {
         &scene0(),
         3.25,
         &vec![
-            Light::new(Vec3::new(-4.0, 6.0, -6.0), 0.8),
-            Light::new(Vec3::new(0.0, 0.0, -6.0), 0.2),
+            Light::new(Vec3::new(-4.0, 6.0, -6.0), 0.75),
+            Light::new(Vec3::new(0.0, 0.0, -6.0), 0.25),
         ],
         background,
         WIDTH,
@@ -178,8 +178,7 @@ fn main() {
         Shape::new()
             .circle(pt(q.0, q.1), radius)
             .fill_color(*BLACK)
-            .stroke_color(*WHITE)
-            // .no_stroke()
+            .no_stroke()
             .draw(&mut canvas);
     }
     canvas.save_png("out.png");
