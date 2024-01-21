@@ -1,33 +1,31 @@
-use crate::core::{Light, Material, Sdf};
+use crate::core::{Light, Lum, Sdf, LUM, SHINE};
 use glam::{Mat3, Vec3};
 use rayon::prelude::*;
 
 const MAX_STEPS: u32 = 512;
 const MAX_DIST: f32 = 100.0;
 const EPSILON: f32 = 0.0001;
-const GAMMA_CORRECTION: f32 = 1.0; //0.4545;
 
 fn reflect(i: Vec3, n: Vec3) -> Vec3 {
     i - n * 2.0 * i.dot(n)
 }
 
-fn phong(light_dir: Vec3, normal: Vec3, rd: Vec3, material: &Material) -> Vec3 {
-    let ambient = material.ambient;
-    let diffuse = material.diffuse * normal.dot(light_dir).clamp(0.0, 1.0);
-    let specular = material.specular
+fn phong(light_dir: Vec3, normal: Vec3, rd: Vec3) -> Lum {
+    let diffuse = LUM * normal.dot(light_dir).clamp(0.0, 1.0);
+    let specular = LUM
         * rd.dot(reflect(light_dir, normal))
             .clamp(0.0, 1.0)
-            .powf(material.shininess);
-    ambient + diffuse + specular
+            .powf(SHINE);
+    LUM + diffuse + specular
 }
 
 fn normal(p: Vec3, sdf: &Sdf) -> Vec3 {
     let x = Vec3::new(EPSILON, 0.0, 0.0);
     let y = Vec3::new(0.0, EPSILON, 0.0);
     let z = Vec3::new(0.0, 0.0, EPSILON);
-    let nx = sdf(p + x).sd - sdf(p - x).sd;
-    let ny = sdf(p + y).sd - sdf(p - y).sd;
-    let nz = sdf(p + z).sd - sdf(p - z).sd;
+    let nx = sdf(p + x) - sdf(p - x);
+    let ny = sdf(p + y) - sdf(p - y);
+    let nz = sdf(p + z) - sdf(p - z);
     Vec3::new(nx, ny, nz).normalize()
 }
 
@@ -42,7 +40,7 @@ fn softshadow(sdf: &Sdf, ro: Vec3, rd: Vec3, mint: f32, maxt: f32, k: f32) -> f3
     let mut res: f32 = 1.0;
     let mut t = mint;
     for _ in 0..16 {
-        let h = sdf(ro + rd * t).sd;
+        let h = sdf(ro + rd * t);
         if h < EPSILON {
             return 0.0;
         }
@@ -60,7 +58,7 @@ fn ambient_occlusion(sdf: &Sdf, p: Vec3, n: Vec3) -> f32 {
     let mut w: f32 = 1.0;
     for i in 0..5 {
         let h = 0.01 + 0.03 * i as f32;
-        let d = sdf(p + n * h).sd;
+        let d = sdf(p + n * h);
         occ += (h - d) * w;
         w *= 0.95;
         if occ > 0.35 {
@@ -70,19 +68,17 @@ fn ambient_occlusion(sdf: &Sdf, p: Vec3, n: Vec3) -> f32 {
     (1.0 - 3.0 * occ).clamp(0.0, 1.0)
 }
 
-fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Vec3) -> Vec3 {
+fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Lum) -> Lum {
     let mut total_dist = 0.0;
     for _ in 0..MAX_STEPS {
         let p = ro + rd * total_dist;
-        let surface = sdf(p);
-        let dist = surface.sd;
+        let dist = sdf(p);
         if dist.abs() < EPSILON {
             let n = normal(p, &sdf);
-            let material = surface.material;
-            let mut col = Vec3::ZERO;
+            let mut col = 0.0;
             lights.iter().for_each(|light| {
                 col += light.intensity
-                    * phong((light.position - p).normalize(), n, rd, &material)
+                    * phong((light.position - p).normalize(), n, rd)
                     * softshadow(sdf, p, (light.position - p).normalize(), 0.1, 1.0, 2.0)
                     * ambient_occlusion(sdf, p, n);
             });
@@ -100,19 +96,19 @@ pub fn render(
     sdf: &Sdf,
     dist_to_camera: f32,
     lights: &[Light],
-    background: Vec3,
+    background: Lum,
     width: u32,
     height: u32,
     anti_aliasing: u32,
 ) -> Vec<u8> {
     let ro = Vec3::new(0.0, 0.0, -dist_to_camera);
     let cam_mat = camera(ro, Vec3::ZERO);
-    let mut img_data: Vec<u8> = Vec::with_capacity((3 * width * height) as usize);
+    let mut img_data: Vec<u8> = Vec::with_capacity((width * height) as usize);
     for y in 0..height {
-        let scanline: Vec<Vec3> = (0..width)
+        let scanline: Vec<u8> = (0..width)
             .into_par_iter()
             .map(|x| {
-                let mut col = Vec3::ZERO;
+                let mut col = 0.0;
                 for m in 0..anti_aliasing {
                     for n in 0..anti_aliasing {
                         let ox = (m as f32) / (anti_aliasing as f32) - 0.5;
@@ -129,18 +125,15 @@ pub fn render(
                                 1.0,
                             )
                             .normalize();
-                        col += march(sdf, ro, rd, lights, background).powf(GAMMA_CORRECTION);
+                        col += march(sdf, ro, rd, lights, background);
                     }
                 }
                 col /= (anti_aliasing * anti_aliasing) as f32;
-                col
+                (col * 255.0) as u8
             })
             .collect();
         for col in scanline {
-            let col = crate::core::grayscale(col);
-            img_data.push((col.x * 255.0) as u8);
-            img_data.push((col.y * 255.0) as u8);
-            img_data.push((col.z * 255.0) as u8);
+            img_data.push(col);
         }
     }
     img_data
