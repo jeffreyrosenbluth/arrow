@@ -4,17 +4,22 @@ use glam::{Affine3A, Vec2, Vec3};
 
 pub fn sd_plane(normal: Vec3, transform: Affine3A) -> Sdf {
     Box::new(move |p| {
+        let transform = transform.inverse();
         let p = transform.transform_point3(p);
         normal.dot(p) + 1.0
     })
 }
 
 pub fn sd_sphere(radius: f32, center: Vec3, transform: Affine3A) -> Sdf {
-    Box::new(move |p| transform.transform_point3(p - center).length() - radius)
+    Box::new(move |p| {
+        let transform = transform.inverse();
+        transform.transform_point3(p - center).length() - radius
+    })
 }
 
 pub fn sd_box(b: Vec3, center: Vec3, transform: Affine3A) -> Sdf {
     Box::new(move |p| {
+        let transform = transform.inverse();
         let p = transform.transform_point3(p - center);
         let q = p.abs() - b;
         q.y.max(q.z).max(q.x).min(0.0) + q.max(Vec3::ZERO).length()
@@ -23,6 +28,7 @@ pub fn sd_box(b: Vec3, center: Vec3, transform: Affine3A) -> Sdf {
 
 pub fn sd_round_box(b: Vec3, radius: f32, center: Vec3, transform: Affine3A) -> Sdf {
     Box::new(move |p| {
+        let transform = transform.inverse();
         let p = transform.transform_point3(p - center);
         let q = p.abs() - b;
         q.x.max(q.y).max(q.z).min(0.0) + q.max(Vec3::ZERO).length() - radius
@@ -31,6 +37,7 @@ pub fn sd_round_box(b: Vec3, radius: f32, center: Vec3, transform: Affine3A) -> 
 
 pub fn sd_torus(radius1: f32, radius2: f32, center: Vec3, transform: Affine3A) -> Sdf {
     Box::new(move |p| {
+        let transform = transform.inverse();
         let p = transform.transform_point3(p - center);
         let q = Vec2::new(p.xz().length() - radius1, p.y);
         q.length() - radius2
@@ -39,6 +46,7 @@ pub fn sd_torus(radius1: f32, radius2: f32, center: Vec3, transform: Affine3A) -
 
 pub fn sd_capsule(radius: f32, center: Vec3, a: Vec3, b: Vec3, transform: Affine3A) -> Sdf {
     Box::new(move |p| {
+        let transform = transform.inverse();
         let p = transform.transform_point3(p - center);
         let pa = p - a;
         let ba = b - a;
@@ -49,6 +57,7 @@ pub fn sd_capsule(radius: f32, center: Vec3, a: Vec3, b: Vec3, transform: Affine
 
 pub fn sd_cylinder(radius: f32, center: Vec3, bottom: Vec3, top: Vec3, transform: Affine3A) -> Sdf {
     Box::new(move |p| {
+        let transform = transform.inverse();
         let p = transform.transform_point3(p - center);
         let pa = p - bottom;
         let ba = top - bottom;
@@ -64,5 +73,13 @@ pub fn sd_cylinder(radius: f32, center: Vec3, bottom: Vec3, top: Vec3, transform
             (if x > 0.0 { x2 } else { 0.0 }) + (if y > 0.0 { y2 } else { 0.0 })
         };
         d.signum() * d.abs().sqrt() / baba
+    })
+}
+
+pub fn sd_inf_cylinder(radius: f32, direction: Vec2, transform: Affine3A) -> Sdf {
+    Box::new(move |p| {
+        let transform = transform.inverse();
+        let p = transform.transform_point3(p);
+        (p.xz() - direction).length() - radius
     })
 }

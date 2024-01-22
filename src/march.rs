@@ -1,4 +1,4 @@
-use crate::core::{Light, Lum, Sdf, LUM, SHINE};
+use crate::core::{v3, Light, Lum, Sdf, LUM, SHINE, ZERO3};
 use glam::{Mat3, Vec3};
 use rayon::prelude::*;
 
@@ -20,18 +20,18 @@ fn phong(light_dir: Vec3, normal: Vec3, rd: Vec3) -> Lum {
 }
 
 fn normal(p: Vec3, sdf: &Sdf) -> Vec3 {
-    let x = Vec3::new(EPSILON, 0.0, 0.0);
-    let y = Vec3::new(0.0, EPSILON, 0.0);
-    let z = Vec3::new(0.0, 0.0, EPSILON);
+    let x = v3(EPSILON, 0.0, 0.0);
+    let y = v3(0.0, EPSILON, 0.0);
+    let z = v3(0.0, 0.0, EPSILON);
     let nx = sdf(p + x) - sdf(p - x);
     let ny = sdf(p + y) - sdf(p - y);
     let nz = sdf(p + z) - sdf(p - z);
-    Vec3::new(nx, ny, nz).normalize()
+    v3(nx, ny, nz).normalize()
 }
 
 fn camera(pos: Vec3, look_at: Vec3) -> Mat3 {
     let forward = (look_at - pos).normalize();
-    let right = Vec3::new(0.0, 1.0, 0.0).cross(forward).normalize();
+    let right = v3(0.0, 1.0, 0.0).cross(forward).normalize();
     let up = forward.cross(right).normalize();
     Mat3::from_cols(right, up, forward)
 }
@@ -79,7 +79,7 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Lum) -> Lu
             lights.iter().for_each(|light| {
                 col += light.intensity
                     * phong((light.position - p).normalize(), n, rd)
-                    * softshadow(sdf, p, (light.position - p).normalize(), 0.1, 1.0, 2.0)
+                    * softshadow(sdf, p, (light.position - p).normalize(), 0.2, 1.0, 4.0)
                     * ambient_occlusion(sdf, p, n);
             });
             return col;
@@ -101,8 +101,8 @@ pub fn render(
     height: u32,
     anti_aliasing: u32,
 ) -> Vec<u8> {
-    let ro = Vec3::new(0.0, 0.0, -dist_to_camera);
-    let cam_mat = camera(ro, Vec3::ZERO);
+    let ro = v3(0.0, 0.0, -dist_to_camera);
+    let cam_mat = camera(ro, ZERO3);
     let mut img_data: Vec<u8> = Vec::with_capacity((width * height) as usize);
     for y in 0..height {
         let scanline: Vec<u8> = (0..width)
@@ -113,18 +113,13 @@ pub fn render(
                     for n in 0..anti_aliasing {
                         let ox = (m as f32) / (anti_aliasing as f32) - 0.5;
                         let oy = (n as f32) / (anti_aliasing as f32) - 0.5;
-                        let uv = Vec3::new(
-                            (x as f32) / (height as f32),
-                            (height as f32 - y as f32) / (height as f32), // flip y
+                        let uv = v3(
+                            (2.0 * ((x as f32) + ox) - width as f32) / (height as f32),
+                            (2.0 * ((height as f32 - y as f32) + oy) - height as f32)
+                                / (height as f32),
                             0.0,
                         );
-                        let rd = cam_mat
-                            * Vec3::new(
-                                (uv.x + ox / height as f32) * 2.0 - 1.0,
-                                (uv.y + oy / height as f32) * 2.0 - 1.0,
-                                1.0,
-                            )
-                            .normalize();
+                        let rd = cam_mat * v3(uv.x, uv.y, 1.0).normalize();
                         col += march(sdf, ro, rd, lights, background);
                     }
                 }
