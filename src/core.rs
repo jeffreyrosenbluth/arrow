@@ -1,3 +1,4 @@
+use ::noise::{Fbm, NoiseFn, Perlin};
 use glam::{Affine3A, Vec3};
 
 pub const I: Affine3A = Affine3A::IDENTITY;
@@ -13,7 +14,7 @@ pub fn v3(x: f32, y: f32, z: f32) -> Vec3 {
     Vec3::new(x, y, z)
 }
 
-pub fn modulus(a: f32, b: f32) -> f32 {
+pub fn modulo(a: f32, b: f32) -> f32 {
     ((a % b) + b) % b
 }
 
@@ -75,7 +76,34 @@ pub fn smooth_difference(sdf1: Sdf, sdf2: Sdf, k: f32) -> Sdf {
     })
 }
 
-pub fn perturb(sdf: Sdf, f: fn(Vec3) -> f32) -> Sdf {
+pub fn map_xyz(sdf: Sdf, f: fn(Vec3) -> Vec3) -> Sdf {
+    Box::new(move |p| sdf(f(p)))
+}
+
+pub fn map_x(sdf: Sdf, f: fn(f32) -> f32) -> Sdf {
+    Box::new(move |p| sdf(v3(f(p.x), p.y, p.z)))
+}
+
+pub fn map_y(sdf: Sdf, f: fn(f32) -> f32) -> Sdf {
+    Box::new(move |p| sdf(v3(p.x, f(p.y), p.z)))
+}
+
+pub fn map_z(sdf: Sdf, f: fn(f32) -> f32) -> Sdf {
+    Box::new(move |p| sdf(v3(p.x, p.y, f(p.z))))
+}
+
+pub fn mirror_x(sdf: Sdf) -> Sdf {
+    map_x(sdf, |x| x.abs())
+}
+
+pub fn mirror_y(sdf: Sdf) -> Sdf {
+    map_y(sdf, |x| x.abs())
+}
+
+pub fn perturb<F>(sdf: Sdf, f: F) -> Sdf
+where
+    F: Fn(Vec3) -> f32 + Sync + Send + 'static,
+{
     Box::new(move |p| sdf(p) + f(p))
 }
 
@@ -94,17 +122,53 @@ pub fn intersects(sdfs: Vec<Sdf>) -> Sdf {
 }
 
 pub fn repeat_x(sdf: Sdf, space: f32) -> Sdf {
-    Box::new(move |p| {
-        let mut r = p;
-        r.x = p.x - space * (p.x / space).round();
-        sdf(r)
-    })
+    Box::new(move |p| sdf(v3(p.x - space * (p.x / space).round(), p.y, p.z)))
 }
 
 pub fn repeat_y(sdf: Sdf, space: f32) -> Sdf {
-    Box::new(move |p| {
-        let mut r = p;
-        r.y = p.y - space * (p.y / space).round();
-        sdf(r)
-    })
+    Box::new(move |p| sdf(v3(p.x, p.y - space * (p.y / space).round(), p.z)))
+}
+
+pub fn repeat_z(sdf: Sdf, space: f32) -> Sdf {
+    Box::new(move |p| sdf(v3(p.x, p.y, p.z - space * (p.z / space).round())))
+}
+
+pub fn mix(a: f32, b: f32, t: f32) -> f32 {
+    a * (1.0 - t) + b * t
+}
+
+pub struct Noise {
+    octaves: u32,
+    frequency: f32,
+    amplitude: f32,
+    nf: Fbm<Perlin>,
+}
+
+impl Noise {
+    pub fn new(octaves: u32, frequency: f32, amplitude: f32) -> Self {
+        let nf = Fbm::<Perlin>::new(0);
+        Self {
+            octaves,
+            frequency,
+            amplitude,
+            nf,
+        }
+    }
+
+    pub fn get(&self, p: Vec3) -> f32 {
+        let mut value = 0.0;
+        let mut amplitude = self.amplitude as f64;
+        let mut frequency = self.frequency as f64;
+        for _ in 0..self.octaves {
+            value += amplitude
+                * self.nf.get([
+                    p.x as f64 * frequency,
+                    p.y as f64 * frequency,
+                    p.z as f64 * frequency,
+                ]);
+            amplitude *= 0.5;
+            frequency *= 2.0;
+        }
+        value as f32
+    }
 }

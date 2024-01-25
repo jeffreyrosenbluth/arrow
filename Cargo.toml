@@ -8,4 +8,6 @@ edition = "2021"
 [dependencies]
 glam = "0.25.0"
 image = "0.24.7"
+noise = "0.8.2"
 rayon = "1.8.0"
+winnow = "0.5.34"

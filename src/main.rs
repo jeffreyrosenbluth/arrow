@@ -1,4 +1,4 @@
-use std::vec;
+use std::{f32::consts::PI, vec};
 
 use arrow::core::*;
 use arrow::march::render;
@@ -15,6 +15,8 @@ fn displacement(p: Vec3) -> f32 {
 
 #[allow(dead_code)]
 fn scene0() -> Sdf {
+    let noise = Noise::new(1, 0.25, 0.6);
+    let displacement = move |p: Vec3| noise.get(p);
     let sphere_gold = perturb(sd_sphere(1.0, v3(-1.0, 0.0, 0.0), I), displacement);
     let sphere_red = sd_sphere(0.75, v3(1.0, 0.0, 0.0), I);
     let floor = sd_plane(v3(0.05, 1.0, 0.0), I);
@@ -27,8 +29,8 @@ fn scene0() -> Sdf {
     let torus = sd_torus(0.7, 0.15, v3(0.1, 0.0, -0.2), tr);
 
     let capsule = sd_capsule(
-        0.25,
-        v3(-0.5, 1.9, 0.1),
+        0.15,
+        v3(-0.5, 1.9, 0.0),
         v3(-1.0, 0.0, 0.0),
         v3(1.0, 0.0, 0.0),
         I,
@@ -36,7 +38,13 @@ fn scene0() -> Sdf {
 
     let rounded_cube = round(sd_box(v3(0.4, 0.3, 0.0), v3(-1.9, 1.9, 0.0), I), 0.2);
 
-    let hammer = smooth_union(rounded_cube, capsule, 0.4);
+    fn ninety(p: Vec3) -> Vec3 {
+        let mut tr = Affine3A::from_rotation_z(-PI / 2.0);
+        tr = tr * Affine3A::from_translation(v3(2.2, -1.5, -0.5));
+        tr.transform_point3(p)
+    }
+
+    let hammer = map_xyz(smooth_union(rounded_cube, capsule, 0.4), ninety);
 
     let rep_ball = repeat_y(sd_sphere(0.07, v3(3.0, 0.0, -0.175), I), 0.25);
 
@@ -49,22 +57,20 @@ fn scene0() -> Sdf {
 
     let cylinder = sd_cylinder(
         0.1,
-        v3(0.0, 0.0, 0.0),
-        v3(1.75, -0.5, -1.0),
-        v3(1.25, 0.5, -1.5),
+        v3(-0.2, 0.0, -0.2),
+        v3(1.75, -0.25, -1.0),
+        v3(1.25, 1.0, -1.5),
         I,
     );
 
-    let inf_cylinder = sd_inf_cylinder(0.1, Vec2::new(-3.0, 0.0), I);
+    let inf_cylinder = mirror_x(sd_inf_cylinder(0.1, Vec2::new(2.9, 0.0), I));
 
     let a = unions(vec![
         sphere_gold,
         floor,
         torus,
-        // capsule,
         hammer,
         frame,
-        // rounded_cube,
         cylinder,
         inf_cylinder,
         rep_ball,
@@ -91,7 +97,7 @@ fn main() {
         background,
         WIDTH,
         HEIGHT,
-        2,
+        4,
     );
-    image::save_buffer("out.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
+    image::save_buffer("out_0.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
 }

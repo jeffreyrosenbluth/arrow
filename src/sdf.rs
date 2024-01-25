@@ -76,10 +76,10 @@ pub fn sd_cylinder(radius: f32, center: Vec3, bottom: Vec3, top: Vec3, transform
     })
 }
 
-pub fn sd_inf_cylinder(radius: f32, direction: Vec2, transform: Affine3A) -> Sdf {
+pub fn sd_inf_cylinder(radius: f32, xz: Vec2, transform: Affine3A) -> Sdf {
     Box::new(move |p| {
         let transform = transform.inverse();
         let p = transform.transform_point3(p);
-        (p.xz() - direction).length() - radius
+        (p.xz() - xz).length() - radius
     })
 }
