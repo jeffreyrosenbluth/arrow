@@ -1,6 +1,6 @@
 use crate::ast::*;
 use winnow::ascii::{alpha1, alphanumeric0};
-use winnow::combinator::{opt, separated};
+use winnow::combinator::{fail, opt, separated};
 use winnow::prelude::*;
 use winnow::token::take;
 use winnow::{
@@ -64,27 +64,33 @@ fn product(i: &mut &str) -> PResult<Expr> {
 fn scalar(i: &mut &str) -> PResult<Expr> {
     delimited(
         multispaces,
-        alt((float.map(Expr::Scalar), function, parens)),
+        alt((float.map(Expr::Scalar), function, parens, variable)),
         multispaces,
     )
     .parse_next(i)
 }
 
-fn identifier(i: &mut &str) -> PResult<String> {
+fn variable(i: &mut &str) -> PResult<Expr> {
     let c1 = take(1u8).and_then(alpha1).parse_next(i)?;
-    let c2 = opt(take(1u8).and_then(alphanumeric0)).parse_next(i)?;
+    let c2 = opt(alphanumeric0).parse_next(i)?;
     match c2 {
-        Some(c) => Ok(format!("{}{}", c1, c)),
-        None => Ok(c1.to_string()),
+        Some(c) => {
+            if c.len() > 1 {
+                fail(i)
+            } else {
+                Ok(Expr::Variable(format!("{}{}", c1, c)))
+            }
+        }
+        None => Ok(Expr::Variable(c1.to_string())),
     }
 }
 
 fn assign_scalar(i: &mut &str) -> PResult<Expr> {
-    let lhs = identifier.parse_next(i)?;
+    let lhs = variable.parse_next(i)?;
     delimited(multispaces, "=", multispaces).parse_next(i)?;
     let rhs = expr.parse_next(i)?;
     Ok(Expr::Assign {
-        lhs,
+        lhs: Box::new(lhs),
         rhs: Box::new(rhs),
     })
 }
@@ -108,24 +114,26 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "pow".map(|_| Pow),
             "sqrt".map(|_| Sqrt),
             "abs".map(|_| Abs),
-            "B".map(|_| Abs),
             "sign".map(|_| Sign),
             "floor".map(|_| Floor),
             "ceil".map(|_| Ceil),
             "fract".map(|_| Fract),
-        )),
-        alt((
             "mod".map(|_| Mod),
             "min".map(|_| Min),
             "max".map(|_| Max),
             "clamp".map(|_| Clamp),
             "mix".map(|_| Mix),
+            // 21
+        )),
+        alt((
+            "B".map(|_| Abs),
             "SM".map(|_| Smoothstep),
             "L".map(|_| Length),
-            "distance".map(|_| Distance),
+            "H".map(|_| Distance),
             "D".map(|_| Dot),
             "X".map(|_| Cross),
             "N".map(|_| Normalize),
+            // 8..=21
         )),
     ))
     .parse_next(i)
@@ -172,6 +180,13 @@ mod tests {
     ));
         assert_eq!(expr.map(|e| format!("{e:?}")).parse_peek(input), expected);
 
+        let input = "1.0 * 0.004 + 0.1";
+        let expected = Ok((
+            "",
+            String::from("BinaryOp(Add(BinaryOp(Mul(Scalar(1.0), Scalar(0.004))), Scalar(0.1)))"),
+        ));
+        assert_eq!(expr.map(|e| format!("{e:?}")).parse_peek(input), expected);
+
         let input = "sin(3.14) / 2.0";
         let expected = Ok((
             "",
@@ -184,14 +199,20 @@ mod tests {
         let input = "aa = sin(1.0) / 2.0";
         let expected = Ok((
             "",
-            String::from("Assign { lhs: \"aa\", rhs: BinaryOp(Div(Function { name: Sin, args: [Scalar(1.0)] }, Scalar(2.0))) }"),
+            String::from("Assign { lhs: Variable(\"aa\"), rhs: BinaryOp(Div(Function { name: Sin, args: [Scalar(1.0)] }, Scalar(2.0))) }"),
         ));
         assert_eq!(expr.map(|e| format!("{e:?}")).parse_peek(input), expected);
 
         let input = "x3 = (1.0 + 2.0) * 3.0";
         let expected = Ok((
             "",
-            String::from("Assign { lhs: \"x3\", rhs: BinaryOp(Mul(Paren(BinaryOp(Add(Scalar(1.0), Scalar(2.0)))), Scalar(3.0))) }"),
+            String::from("Assign { lhs: Variable(\"x3\"), rhs: BinaryOp(Mul(Paren(BinaryOp(Add(Scalar(1.0), Scalar(2.0)))), Scalar(3.0))) }"),
+        ));
+        assert_eq!(expr.map(|e| format!("{e:?}")).parse_peek(input), expected);
+        let input = "a=z*0.004+0.1";
+        let expected = Ok((
+            "",
+            String::from("Assign { lhs: Variable(\"a\"), rhs: BinaryOp(Add(BinaryOp(Mul(Variable(\"z\"), Scalar(-0.004))), Scalar(0.1))) }"),
         ));
         assert_eq!(expr.map(|e| format!("{e:?}")).parse_peek(input), expected);
     }
@@ -311,12 +332,18 @@ mod tests {
     #[test]
     fn identifier_test() {
         let input = "a";
-        let expected = Ok(("", String::from("a")));
-        assert_eq!(identifier.parse_peek(input), expected);
+        let expected = Ok(("", String::from("Variable(\"a\")")));
+        assert_eq!(
+            variable.map(|e| format!("{e:?}")).parse_peek(input),
+            expected
+        );
 
-        let input = "a2c";
-        let expected = Ok(("c", String::from("a2")));
-        assert_eq!(identifier.parse_peek(input), expected);
+        let input = "a2";
+        let expected = Ok(("", String::from("Variable(\"a2\")")));
+        assert_eq!(
+            variable.map(|e| format!("{e:?}")).parse_peek(input),
+            expected
+        );
     }
 
     #[test]
@@ -324,7 +351,7 @@ mod tests {
         let input = "ab = 1.57";
         let expected = Ok((
             "",
-            String::from("Assign { lhs: \"ab\", rhs: Scalar(1.57) }"),
+            String::from("Assign { lhs: Variable(\"ab\"), rhs: Scalar(1.57) }"),
         ));
         assert_eq!(
             assign_scalar.map(|e| format!("{e:?}")).parse_peek(input),
@@ -334,11 +361,20 @@ mod tests {
         let input = "a = sin(1.0) / 2.0";
         let expected = Ok((
             "",
-            String::from("Assign { lhs: \"a\", rhs: BinaryOp(Div(Function { name: Sin, args: [Scalar(1.0)] }, Scalar(2.0))) }"),
+            String::from("Assign { lhs: Variable(\"a\"), rhs: BinaryOp(Div(Function { name: Sin, args: [Scalar(1.0)] }, Scalar(2.0))) }"),
         ));
         assert_eq!(
             assign_scalar.map(|e| format!("{e:?}")).parse_peek(input),
             expected
         );
+
+        let input = "a= -0.004 + 0.1";
+        let expected = Ok((
+            "",
+            String::from(
+                "Assign { lhs: Variable(\"a\"), rhs: BinaryOp(Add(Scalar(-0.004), Scalar(0.1))) }",
+            ),
+        ));
+        assert_eq!(expr.map(|e| format!("{e:?}")).parse_peek(input), expected);
     }
 }

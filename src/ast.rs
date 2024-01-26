@@ -4,7 +4,7 @@ pub enum Expr {
     BinaryOp(BinOp),
     UnaryOp,
     Paren(Box<Expr>),
-    Assign { lhs: String, rhs: Box<Expr> },
+    Assign { lhs: Box<Expr>, rhs: Box<Expr> },
     Function { name: FunctionName, args: Vec<Expr> },
     Variable(String),
 }
