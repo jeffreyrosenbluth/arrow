@@ -5,6 +5,8 @@ pub enum Statement {
     Assign { var: String, rhs: Box<Expr> },
     AssignArray { vars: Vec<String>, rhs: Box<Expr> },
     Sequence(Vec<Statement>),
+    ForNumeric { n: u32, block: Vec<Statement> },
+    ForAlpha { a: String, block: Vec<Statement> },
     Return(Box<Expr>),
 }
 
@@ -24,6 +26,7 @@ pub enum BinOp {
     Sub(Box<Expr>, Box<Expr>),
     Mul(Box<Expr>, Box<Expr>),
     Div(Box<Expr>, Box<Expr>),
+    Eq(Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug, Clone, Serialize)]

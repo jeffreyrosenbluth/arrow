@@ -1,8 +1,8 @@
 use crate::ast::*;
-use winnow::ascii::{alpha1, alphanumeric0};
-use winnow::combinator::{fail, opt, separated};
+use winnow::ascii::{alpha1, alphanumeric0, dec_uint};
+use winnow::combinator::{fail, opt, preceded, separated};
 use winnow::prelude::*;
-use winnow::token::take;
+use winnow::token::{take, take_until};
 use winnow::{
     ascii::{float, multispace0 as multispaces},
     combinator::{alt, delimited, fold_repeat},
@@ -18,6 +18,14 @@ fn rbracket<'a>(i: &mut &'a str) -> PResult<&'a str> {
     delimited(multispaces, "]", multispaces).parse_next(i)
 }
 
+fn lbrace<'a>(i: &mut &'a str) -> PResult<&'a str> {
+    delimited(multispaces, "{", multispaces).parse_next(i)
+}
+
+fn rbrace<'a>(i: &mut &'a str) -> PResult<&'a str> {
+    delimited(multispaces, "}", multispaces).parse_next(i)
+}
+
 fn comma<'a>(i: &mut &'a str) -> PResult<&'a str> {
     delimited(multispaces, ",", multispaces).parse_next(i)
 }
@@ -25,16 +33,29 @@ fn comma<'a>(i: &mut &'a str) -> PResult<&'a str> {
 pub fn statement(i: &mut &str) -> PResult<Statement> {
     delimited(
         multispaces,
-        alt((assign_array, assign_scalar, return_statement, statements)),
+        alt((
+            for_numeric,
+            for_alpha,
+            assign_array,
+            assign_scalar,
+            assign_add,
+            assign_sub,
+            assign_mul,
+            assign_div,
+            assign_inc,
+            return_statement,
+            statements,
+        )),
         multispaces,
     )
     .parse_next(i)
 }
 
 fn statements(i: &mut &str) -> PResult<Statement> {
-    separated(1.., statement, ",")
+    let s = separated(1.., statement, alt((",", ";")))
         .map(|stmts| Statement::Sequence(stmts))
-        .parse_next(i)
+        .parse_next(i)?;
+    Ok(s)
 }
 
 fn assign_scalar(i: &mut &str) -> PResult<Statement> {
@@ -55,6 +76,100 @@ fn assign_array(i: &mut &str) -> PResult<Statement> {
     Ok(Statement::AssignArray {
         vars,
         rhs: Box::new(expression),
+    })
+}
+
+fn assign_add(i: &mut &str) -> PResult<Statement> {
+    use crate::ast::BinOp::*; // Not sure why this is needed, otherwise it complains about Add not being in scope.
+    let var = identifier.parse_next(i)?;
+    delimited(multispaces, "+=", multispaces).parse_next(i)?;
+    let rhs = expr.parse_next(i)?;
+    Ok(Statement::Assign {
+        var: var.clone(),
+        rhs: Box::new(Expr::BinaryOp(Add(
+            Box::new(Expr::Variable(var)),
+            Box::new(rhs),
+        ))),
+    })
+}
+
+fn assign_sub(i: &mut &str) -> PResult<Statement> {
+    use crate::ast::BinOp::*; // Not sure why this is needed, otherwise it complains about Sub not being in scope.
+    let var = identifier.parse_next(i)?;
+    delimited(multispaces, "+=", multispaces).parse_next(i)?;
+    let rhs = expr.parse_next(i)?;
+    Ok(Statement::Assign {
+        var: var.clone(),
+        rhs: Box::new(Expr::BinaryOp(Sub(
+            Box::new(Expr::Variable(var)),
+            Box::new(rhs),
+        ))),
+    })
+}
+
+fn assign_mul(i: &mut &str) -> PResult<Statement> {
+    use crate::ast::BinOp::*; // Not sure why this is needed, otherwise it complains about Mul not being in scope.
+    let var = identifier.parse_next(i)?;
+    delimited(multispaces, "+=", multispaces).parse_next(i)?;
+    let rhs = expr.parse_next(i)?;
+    Ok(Statement::Assign {
+        var: var.clone(),
+        rhs: Box::new(Expr::BinaryOp(Mul(
+            Box::new(Expr::Variable(var)),
+            Box::new(rhs),
+        ))),
+    })
+}
+
+fn assign_div(i: &mut &str) -> PResult<Statement> {
+    use crate::ast::BinOp::*; // Not sure why this is needed, otherwise it complains about Div not being in scope.
+    let var = identifier.parse_next(i)?;
+    delimited(multispaces, "+=", multispaces).parse_next(i)?;
+    let rhs = expr.parse_next(i)?;
+    Ok(Statement::Assign {
+        var: var.clone(),
+        rhs: Box::new(Expr::BinaryOp(Div(
+            Box::new(Expr::Variable(var)),
+            Box::new(rhs),
+        ))),
+    })
+}
+
+fn assign_inc(i: &mut &str) -> PResult<Statement> {
+    let var = identifier.parse_next(i)?;
+    delimited(multispaces, "++", multispaces).parse_next(i)?;
+    Ok(Statement::Assign {
+        var: var.clone(),
+        rhs: Box::new(Expr::BinaryOp(BinOp::Add(
+            Box::new(Expr::Variable(var)),
+            Box::new(Expr::Scalar(1.0)),
+        ))),
+    })
+}
+
+fn block(i: &mut &str) -> PResult<Vec<Statement>> {
+    lbrace.parse_next(i)?;
+    let block = take_until(0.., ",}").and_then(statements).parse_next(i)?;
+    opt(",").parse_next(i)?;
+    rbrace.parse_next(i)?;
+    if let Statement::Sequence(stmts) = block {
+        return Ok(stmts);
+    }
+    fail(i)
+}
+
+fn for_numeric(i: &mut &str) -> PResult<Statement> {
+    let n: u32 = preceded("@", dec_uint).parse_next(i)?;
+    let block = block.parse_next(i)?;
+    Ok(Statement::ForNumeric { n, block })
+}
+
+fn for_alpha(i: &mut &str) -> PResult<Statement> {
+    let a = preceded("@", alpha1).parse_next(i)?;
+    let block = block.parse_next(i)?;
+    Ok(Statement::ForAlpha {
+        a: a.to_string(),
+        block,
     })
 }
 
@@ -85,10 +200,6 @@ fn sum(i: &mut &str) -> PResult<Expr> {
     .parse_next(i)
 }
 
-// fn unop(i: &mut &str) -> PResult<Expr> {
-//     '-'.map(|_| Expr::UnaryOp).parse_next(i)
-// }
-
 fn product(i: &mut &str) -> PResult<Expr> {
     use BinOp::*;
     let init = scalar.parse_next(i)?;
@@ -118,6 +229,10 @@ fn scalar(i: &mut &str) -> PResult<Expr> {
 }
 
 fn identifier(i: &mut &str) -> PResult<String> {
+    let c1 = opt("$").parse_next(i)?;
+    if c1 == Some("$") {
+        return Ok("$".to_string());
+    };
     let c1 = take(1u8).and_then(alpha1).parse_next(i)?;
     let c2 = opt(alphanumeric0).parse_next(i)?;
     match c2 {
@@ -240,14 +355,34 @@ mod tests {
     }
 
     #[test]
-    fn pathways() {
-        let input = "s=10,[x,z]=r0(x,z),[y,z]=r1(z,y),[y,x]=r0(y,x),@xyz{$m=mod($,1)-.5,}b=bx3(xm,ym,zm,.45)-.05,t=[0,2,3,1],i=1,n=(a=i++)=>nz(z,x,y,.01,a,a==1?2:1)*t[a]*100,@yxz{$+=n(),}@xz{$b=mod($,s*2)-s,}rG(b,bx2(bx2(xb,zb,s),TR((y+2)/40)*40,1,2.2)-.2,.3)-.1";
-        let expected = Ok(("", String::from("")));
+    fn g67() {
+        let input = "s=10; @1{a=sin(y),b=sin(x),c=sin(z),d=x,e=s+1,}; SM(a,b,c,d,e)-5";
+        let expected = Ok(("", String::from("Sequence([Assign { var: \"s\", rhs: Scalar(10.0) }, ForNumeric { n: 1, block: [Assign { var: \"a\", rhs: Function { name: Sin, args: [Variable(\"y\")] } }, Assign { var: \"b\", rhs: Function { name: Sin, args: [Variable(\"x\")] } }, Assign { var: \"c\", rhs: Function { name: Sin, args: [Variable(\"z\")] } }, Assign { var: \"d\", rhs: Variable(\"x\") }, Assign { var: \"e\", rhs: BinaryOp(Add(Variable(\"s\"), Scalar(1.0))) }] }, Return(BinaryOp(Sub(Function { name: Smoothstep, args: [Variable(\"a\"), Variable(\"b\"), Variable(\"c\"), Variable(\"d\"), Variable(\"e\")] }, Scalar(5.0))))])")));
         assert_eq!(
             statements.map(|e| format!("{e:?}")).parse_peek(input),
             expected
         );
     }
+
+    // #[test]
+    // fn pathways() {
+    //     let input = "s=10,[x,z]=r0(x,z),[y,z]=r1(z,y),[y,x]=r0(y,x),@xyz{$m=mod($,1)-.5,}b=bx3(xm,ym,zm,.45)-.05,t=[0,2,3,1],i=1,n=(a=i++)=>nz(z,x,y,.01,a,a==1?2:1)*t[a]*100,@yxz{$+=n(),}@xz{$b=mod($,s*2)-s,}rG(b,bx2(bx2(xb,zb,s),TR((y+2)/40)*40,1,2.2)-.2,.3)-.1";
+    //     let expected = Ok(("", String::from("")));
+    //     assert_eq!(
+    //         statements.map(|e| format!("{e:?}")).parse_peek(input),
+    //         expected
+    //     );
+    // }
+
+    // #[test]
+    // fn quanta() {
+    //     let input = "s=20,[x,z]=r0(x,z),[y,x]=r1(y,x),z+=17,y+=27,i=0,z+=ri(Z(x/s))*70,@xz{$-=nz(x,y,z,.1,i++)*5*i,$i=Z($/s),$=mod($,s)-s/2,}i=ri(xi,zi),j=ri(xi,floor(y/5)),d=i>.1?rU(L(x,z)-1*i-.5*(cos(y/4)+1),bx2(L(x,z)-(cos(floor(y/4))+1)*2,mod(y,4)-2,.1,.2)-.05,1):L(x,mod(y,5)-2.5,z)-G(j,0)*2";
+    //     let expected = Ok(("", String::from("")));
+    //     assert_eq!(
+    //         statements.map(|e| format!("{e:?}")).parse_peek(input),
+    //         expected
+    //     );
+    // }
 
     #[test]
     fn statement_test() {
@@ -273,6 +408,26 @@ mod tests {
             "",
             String::from("Sequence([Assign { var: \"p\", rhs: BinaryOp(Sub(Function { name: Abs, args: [BinaryOp(Sub(Variable(\"y\"), Scalar(18.0)))] }, Scalar(13.0))) }, Assign { var: \"n\", rhs: BinaryOp(Mul(Function { name: ValueNoise, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\"), Scalar(0.4), Scalar(0.0), Scalar(2.0)] }, Scalar(2.0))) }, Assign { var: \"q\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"p\"), BinaryOp(Add(Scalar(12.0), BinaryOp(Mul(Variable(\"n\"), Variable(\"z\")))))] }, Scalar(1.8))) }])"),
         ));
+        assert_eq!(
+            statements.map(|e| format!("{e:?}")).parse_peek(input),
+            expected
+        );
+
+        let input = "a = 1.0, a++";
+        let expected = Ok((
+            "",
+            String::from("Sequence([Assign { var: \"a\", rhs: Scalar(1.0) }, Assign { var: \"a\", rhs: BinaryOp(Add(Variable(\"a\"), Scalar(1.0))) }])"),
+        ));
+        assert_eq!(
+            statements.map(|e| format!("{e:?}")).parse_peek(input),
+            expected
+        );
+
+        let input = "@xyz{$=B($)-6,}";
+        let expected = Ok((
+            "",
+            String::from("Sequence([ForAlpha { a: \"xyz\", block: [Assign { var: \"$\", rhs: BinaryOp(Sub(Function { name: Abs, args: [Variable(\"$\")] }, Scalar(6.0))) }] }])")),
+        );
         assert_eq!(
             statements.map(|e| format!("{e:?}")).parse_peek(input),
             expected
