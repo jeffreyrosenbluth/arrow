@@ -1,15 +1,24 @@
-#[derive(Debug, Clone)]
+use serde::Serialize;
+
+#[derive(Debug, Clone, Serialize)]
+pub enum Statement {
+    Assign { var: String, rhs: Box<Expr> },
+    AssignArray { vars: Vec<String>, rhs: Box<Expr> },
+    Sequence(Vec<Statement>),
+    Return(Box<Expr>),
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub enum Expr {
     Scalar(f32),
     BinaryOp(BinOp),
     UnaryOp,
     Paren(Box<Expr>),
-    Assign { lhs: Box<Expr>, rhs: Box<Expr> },
     Function { name: FunctionName, args: Vec<Expr> },
     Variable(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum BinOp {
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
@@ -17,7 +26,7 @@ pub enum BinOp {
     Div(Box<Expr>, Box<Expr>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum FunctionName {
     Sin,
     Cos,
@@ -45,4 +54,14 @@ pub enum FunctionName {
     Dot,
     Cross,
     Normalize,
+    Union,
+    Intersect,
+    AddMul,
+    ValueNoise,
+    Torus,
+    Box,
+    Floors,
+    Rot0,
+    Rot1,
+    Triangle,
 }
