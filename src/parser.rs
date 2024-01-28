@@ -8,7 +8,6 @@ use winnow::{
     combinator::{alt, delimited, fold_repeat},
     token::one_of,
 };
-// pub struct Environment(HashMap<String, f32>);
 
 fn lbracket<'a>(i: &mut &'a str) -> PResult<&'a str> {
     delimited(multispaces, "[", multispaces).parse_next(i)
@@ -295,7 +294,7 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "Z".map(|_| Floors),
             "nz".map(|_| ValueNoise),
             "don".map(|_| Torus),
-            "bx3".map(|_| Box),
+            "bx3".map(|_| Box3),
             "r0".map(|_| Rot0),
             "r1".map(|_| Rot1),
             "TR".map(|_| Triangle),

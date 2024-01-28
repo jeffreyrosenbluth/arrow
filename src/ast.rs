@@ -62,9 +62,12 @@ pub enum FunctionName {
     AddMul,
     ValueNoise,
     Torus,
-    Box,
+    Box3,
     Floors,
     Rot0,
     Rot1,
     Triangle,
 }
+
+#[derive(Debug, Clone, Serialize)]
+pub enum Function3Name {}
