@@ -2,11 +2,11 @@ use crate::core::Sdf;
 use glam::Vec3Swizzles;
 use glam::{Affine3A, Vec2, Vec3};
 
-pub fn sd_plane(normal: Vec3, transform: Affine3A) -> Sdf {
+pub fn sd_plane(normal: Vec3, dist_to_origin: f32, transform: Affine3A) -> Sdf {
     Box::new(move |p| {
         let transform = transform.inverse();
         let p = transform.transform_point3(p);
-        normal.dot(p) + 1.0
+        normal.normalize().dot(p) + dist_to_origin
     })
 }
 

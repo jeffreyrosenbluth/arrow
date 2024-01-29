@@ -1,10 +1,10 @@
-use crate::core::{v3, Light, Lum, Sdf, LUM, SHINE, ZERO3};
+use crate::core::{v3, Light, Lum, Sdf, LUM, SHINE};
 use glam::{Mat3, Vec3};
 use rayon::prelude::*;
 
-const MAX_STEPS: u32 = 512;
-const MAX_DIST: f32 = 100.0;
-const EPSILON: f32 = 0.0001;
+const MAX_STEPS: u32 = 128; //512;
+const MAX_DIST: f32 = 75.0;
+const EPSILON: f32 = 0.001;
 
 fn reflect(i: Vec3, n: Vec3) -> Vec3 {
     i - n * 2.0 * i.dot(n)
@@ -94,15 +94,16 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Lum) -> Lu
 
 pub fn render(
     sdf: &Sdf,
-    dist_to_camera: f32,
+    camera_pos: Vec3,
+    look_at: Vec3,
     lights: &[Light],
     background: Lum,
     width: u32,
     height: u32,
     anti_aliasing: u32,
 ) -> Vec<u8> {
-    let ro = v3(0.0, 0.0, -dist_to_camera);
-    let cam_mat = camera(ro, ZERO3);
+    let ro = camera_pos;
+    let cam_mat = camera(ro, look_at);
     let mut img_data: Vec<u8> = Vec::with_capacity((width * height) as usize);
     for y in 0..height {
         let scanline: Vec<u8> = (0..width)

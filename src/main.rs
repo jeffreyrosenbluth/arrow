@@ -1,5 +1,6 @@
 use std::{f32::consts::PI, vec};
 
+use arrow::ast::Statement;
 use arrow::core::*;
 use arrow::march::render;
 use arrow::sdf::*;
@@ -8,6 +9,7 @@ use glam::{Affine3A, Vec2, Vec3};
 const WIDTH: u32 = 1024;
 const HEIGHT: u32 = 768;
 
+#[allow(dead_code)]
 fn displacement(p: Vec3) -> f32 {
     let freq = 10.0;
     (p.x * freq).sin() * (p.y * freq).sin() * (p.z * freq).sin() * 0.1
@@ -19,7 +21,7 @@ fn scene0() -> Sdf {
     let displacement = move |p: Vec3| noise.get(p);
     let sphere_gold = perturb(sd_sphere(1.0, v3(-1.0, 0.0, 0.0), I), displacement);
     let sphere_red = sd_sphere(0.75, v3(1.0, 0.0, 0.0), I);
-    let floor = sd_plane(v3(0.05, 1.0, 0.0), I);
+    let floor = sd_plane(v3(0.05, 1.0, 0.0), 1.0, I);
 
     let mut tr = Affine3A::from_rotation_y(0.5);
     tr = tr * Affine3A::from_rotation_x(-0.35);
@@ -81,23 +83,46 @@ fn scene0() -> Sdf {
 
 #[allow(dead_code)]
 fn scene1() -> Sdf {
-    let plane = sd_plane(v3(0.05, 1.0, 0.0), I);
+    let plane = sd_plane(v3(0.05, 1.0, 0.0), 1.0, I);
     union(plane, sd_sphere(1.0, ZERO3, I))
 }
 
+fn make_sdf(ast: &Statement, p: Vec3) -> f32 {
+    use arrow::eval::*;
+    use std::collections::HashMap;
+    let mut env = HashMap::new();
+    eval(&mut env, &ast, p);
+    let v = env.get("#").unwrap();
+    match v {
+        Value::ScalarVal(s) => *s,
+        _ => panic!("sd is not a scalar"),
+    }
+}
+
 fn main() {
+    use arrow::parser::*;
     let background = 0.75;
+    // let mut input = "U(L(x+28,y-10,z+8)-12, don(x-cl(x,-15,15),y-18,z-20,10,3), bx3(x-20,y-20,z+20,8)-5, L(x+3,y-16)-2)";
+    // let mut input2 = "don(x,y-3,mod(z,8)-4,8,1)";
+    // let mut input2 = "don(x,y-2,z,5,1)";
+    // let mut input3 = "s=10; @1{a=sin(y),b=sin(x),c=sin(z),d=x,e=s+1,}; SM(a,b,c,d,e)-5";
+    let mut input4 = "L(B(B(x)-3)-3,B(y)-3)-2";
+    let ast = program(&mut input4).unwrap();
+    let sdf: Sdf = Box::new(move |p| make_sdf(&ast, p));
+    let plane = sd_plane(v3(0.0, 0.85, 0.3), 10.0, I);
+    let sdf = union(sdf, plane);
     let img_data = render(
-        &scene0(),
-        3.25,
+        &sdf,
+        v3(5.0, 15.0, -30.0),
+        v3(-5.0, -5.0, 0.0),
         &vec![
-            Light::new(v3(-2.0, 6.0, -6.0), 0.7),
-            Light::new(v3(0.0, 0.0, -2.0), 0.1),
+            Light::new(v3(-2.0, 5.0, -6.0), 0.6),
+            Light::new(v3(5.0, 15.0, -6.0), 0.3),
         ],
         background,
         WIDTH,
         HEIGHT,
-        4,
+        1,
     );
-    image::save_buffer("out_0.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
+    image::save_buffer("hatch.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
 }
