@@ -136,23 +136,23 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
     use Value::*;
     match name {
         Sin => {
-            let arg = eval_expr(env, Box::new(args[0].clone()));
-            match arg {
-                ScalarVal(arg) => ScalarVal(arg.sin()),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.sin()),
                 _ => panic!("sin expects scalar values"),
             }
         }
         Cos => {
-            let arg = eval_expr(env, Box::new(args[0].clone()));
-            match arg {
-                ScalarVal(arg) => ScalarVal(arg.cos()),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.cos()),
                 _ => panic!("cos expects scalar values"),
             }
         }
         Tan => {
-            let arg = eval_expr(env, Box::new(args[0].clone()));
-            match arg {
-                ScalarVal(arg) => ScalarVal(arg.tan()),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.tan()),
                 _ => panic!("tan expects scalar values"),
             }
         }
@@ -167,102 +167,102 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
         Exp => {
             let arg = eval_expr(env, Box::new(args[0].clone()));
             match arg {
-                ScalarVal(arg) => ScalarVal(arg.exp()),
+                ScalarVal(x) => ScalarVal(x.exp()),
                 _ => panic!("exp expects scalar values"),
             }
         }
         Exp2 => {
-            let arg = eval_expr(env, Box::new(args[0].clone()));
-            match arg {
-                ScalarVal(arg) => ScalarVal(arg.exp2()),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.exp2()),
                 _ => panic!("exp2 expects scalar values"),
             }
         }
         Log => {
-            let arg = eval_expr(env, Box::new(args[0].clone()));
-            match arg {
-                ScalarVal(arg) => ScalarVal(arg.ln()),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.ln()),
                 _ => panic!("log expects scalar values"),
             }
         }
         Log2 => {
-            let arg = eval_expr(env, Box::new(args[0].clone()));
-            match arg {
-                ScalarVal(arg) => ScalarVal(arg.log2()),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.log2()),
                 _ => panic!("log2 expects scalar values"),
             }
         }
         Pow => {
-            let arg0 = eval_expr(env, Box::new(args[0].clone()));
-            let arg1 = eval_expr(env, Box::new(args[1].clone()));
-            match (arg0, arg1) {
-                (ScalarVal(arg0), ScalarVal(arg1)) => ScalarVal(arg0.powf(arg1)),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let p = eval_expr(env, Box::new(args[1].clone()));
+            match (x, p) {
+                (ScalarVal(x), ScalarVal(p)) => ScalarVal(x.powf(p)),
                 _ => panic!("pow expects scalar values"),
             }
         }
         Sqrt => {
-            let arg = eval_expr(env, Box::new(args[0].clone()));
-            match arg {
-                ScalarVal(arg) => ScalarVal(arg.sqrt()),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(p) => ScalarVal(p.sqrt()),
                 _ => panic!("sqrt expects scalar values"),
             }
         }
         Abs => {
-            let arg = eval_expr(env, Box::new(args[0].clone()));
-            match arg {
-                ScalarVal(arg) => ScalarVal(arg.abs()),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.abs()),
                 _ => panic!("abs expects scalar values"),
             }
         }
         Sign => {
-            let arg = eval_expr(env, Box::new(args[0].clone()));
-            match arg {
-                ScalarVal(arg) => ScalarVal(arg.signum()),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.signum()),
                 _ => panic!("sign expects scalar values"),
             }
         }
         Floor => {
-            let arg = eval_expr(env, Box::new(args[0].clone()));
-            match arg {
-                ScalarVal(arg) => ScalarVal(arg.floor()),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.floor()),
                 _ => panic!("floor expects scalar values"),
             }
         }
         Ceil => {
-            let arg = eval_expr(env, Box::new(args[0].clone()));
-            match arg {
-                ScalarVal(arg) => ScalarVal(arg.ceil()),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.ceil()),
                 _ => panic!("ceil expects scalar values"),
             }
         }
         Fract => {
-            let arg = eval_expr(env, Box::new(args[0].clone()));
-            match arg {
-                ScalarVal(arg) => ScalarVal(arg.fract()),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.fract()),
                 _ => panic!("fract expects scalar values"),
             }
         }
         Mod => {
-            let arg0 = eval_expr(env, Box::new(args[0].clone()));
-            let arg1 = eval_expr(env, Box::new(args[1].clone()));
-            match (arg0, arg1) {
-                (ScalarVal(arg0), ScalarVal(arg1)) => ScalarVal(modulo(arg0, arg1) - 1.0 * arg1),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let m = eval_expr(env, Box::new(args[1].clone()));
+            match (x, m) {
+                (ScalarVal(x), ScalarVal(m)) => ScalarVal(modulo(x, m) - 1.0 * m),
                 _ => panic!("mod expects scalar values"),
             }
         }
         Min => {
-            let arg0 = eval_expr(env, Box::new(args[0].clone()));
-            let arg1 = eval_expr(env, Box::new(args[1].clone()));
-            match (arg0, arg1) {
-                (ScalarVal(arg0), ScalarVal(arg1)) => ScalarVal(arg0.min(arg1)),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let y = eval_expr(env, Box::new(args[1].clone()));
+            match (x, y) {
+                (ScalarVal(x), ScalarVal(y)) => ScalarVal(x.min(y)),
                 _ => panic!("min expects scalar values"),
             }
         }
         Max => {
-            let arg0 = eval_expr(env, Box::new(args[0].clone()));
-            let arg1 = eval_expr(env, Box::new(args[1].clone()));
-            match (arg0, arg1) {
-                (ScalarVal(arg0), ScalarVal(arg1)) => ScalarVal(arg0.max(arg1)),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let y = eval_expr(env, Box::new(args[1].clone()));
+            match (x, y) {
+                (ScalarVal(x), ScalarVal(y)) => ScalarVal(x.max(y)),
                 _ => panic!("max expects scalar values"),
             }
         }
@@ -403,8 +403,43 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
             });
             min.unwrap().clone()
         }
-        Intersect => todo!(),
-        AddMul => todo!(),
+        Intersect => {
+            let ds: Vec<Value> = args
+                .into_iter()
+                .map(|arg| eval_expr(env, Box::new(arg)))
+                .collect();
+            let max = ds.iter().max_by(|a, b| {
+                let a = if let ScalarVal(a) = a {
+                    a
+                } else {
+                    panic!("union expects scalar values")
+                };
+                let b = if let ScalarVal(b) = b {
+                    b
+                } else {
+                    panic!("union expects scalar values")
+                };
+                a.partial_cmp(b).unwrap()
+            });
+            max.unwrap().clone()
+        }
+        AddMul => {
+            todo!()
+            // let arg0 = eval_expr(env, Box::new(args[0].clone()));
+            // let arg1 = eval_expr(env, Box::new(args[1].clone()));
+            // let arg2 = if args.len() > 1 {
+            //     eval_expr(env, Box::new(args[2].clone()))
+            // } else {
+            //     0.0
+            // };
+            // match (arg0, arg1, arg2) {
+            //     (ScalarVal(arg0), ScalarVal(arg1), ScalarVal(arg2)) => {
+            //         ScalarVal(arg0 + arg1 * arg2)
+            //     }
+            //     _ => panic!("addmul expects scalar values"),
+            // }
+        }
+        // A=([x,y,z=0],[a,b,c=0],t=1)=>[x+a*t,y+b*t,z+c*t]
         ValueNoise => todo!(),
         Torus => {
             let arg0 = eval_expr(env, Box::new(args[0].clone()));
@@ -432,10 +467,29 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
             let arg0 = eval_expr(env, Box::new(args[0].clone()));
             let arg1 = eval_expr(env, Box::new(args[1].clone()));
             let arg2 = eval_expr(env, Box::new(args[2].clone()));
-            match (arg0, arg1, arg2) {
-                (ScalarVal(arg0), ScalarVal(arg1), ScalarVal(arg2)) => {
+            let arg3 = eval_expr(env, Box::new(args[3].clone()));
+            let arg4 = if args.len() > 4 {
+                eval_expr(env, Box::new(args[4].clone()))
+            } else {
+                arg3
+            };
+            let arg5 = if args.len() > 5 {
+                eval_expr(env, Box::new(args[5].clone()))
+            } else {
+                arg3
+            };
+            match (arg0, arg1, arg2, arg3, arg4, arg5) {
+                (
+                    ScalarVal(arg0),
+                    ScalarVal(arg1),
+                    ScalarVal(arg2),
+                    ScalarVal(arg3),
+                    ScalarVal(arg4),
+                    ScalarVal(arg5),
+                ) => {
                     let p = v3(arg0, arg1, arg2);
-                    let sdf = sd_box(v3(4.0, 4.0, 0.0), v3(0.0, -20.0, 5.0), I);
+                    let b = v3(arg3, arg4, arg5);
+                    let sdf = sd_box(b, ZERO3, I);
                     ScalarVal(sdf(p))
                 }
                 _ => panic!("box3 expects scalar values"),
@@ -444,6 +498,55 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
         Floors => todo!(),
         Rot0 => todo!(),
         Rot1 => todo!(),
-        Triangle => todo!(),
+        Triangle => {
+            let arg0 = eval_expr(env, Box::new(args[0].clone()));
+            match arg0 {
+                ScalarVal(arg0) => ScalarVal((arg0 - (arg0 / 4.0).floor() * 4.0 - 2.0).abs() - 1.0),
+                _ => panic!("triangle expects scalar values"),
+            }
+        }
+        Corner => {
+            let arg0 = eval_expr(env, Box::new(args[0].clone()));
+            let arg1 = eval_expr(env, Box::new(args[1].clone()));
+            match (arg0, arg1) {
+                (ScalarVal(arg0), ScalarVal(arg1)) => {
+                    if arg0 > 0.0 && arg1 > 0.0 {
+                        ScalarVal(v3(arg0, arg1, 0.0).length())
+                    } else {
+                        ScalarVal(arg0.max(arg1))
+                    }
+                }
+                _ => panic!("corner expects scalar values"),
+            }
+        }
+        SmoothAbs => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let p = if args.len() > 1 {
+                eval_expr(env, Box::new(args[1].clone()))
+            } else {
+                ScalarVal(0.5)
+            };
+            match (x, p) {
+                (ScalarVal(x), ScalarVal(p)) => ScalarVal(smooth_abs(x, p)),
+                _ => panic!("smoothabs expects scalar values"),
+            }
+        }
+        SmoothClamp => {
+            let arg0 = eval_expr(env, Box::new(args[0].clone()));
+            let arg1 = eval_expr(env, Box::new(args[1].clone()));
+            let arg2 = eval_expr(env, Box::new(args[2].clone()));
+            let arg3 = eval_expr(env, Box::new(args[3].clone()));
+            match (arg0, arg1, arg2, arg3) {
+                (ScalarVal(arg0), ScalarVal(arg1), ScalarVal(arg2), ScalarVal(arg3)) => ScalarVal(
+                    (smooth_abs(arg0 - arg2, arg1) - smooth_abs(arg0 - arg3, arg2) + arg2 + arg3)
+                        / 2.0,
+                ),
+                _ => panic!("smoothclamp expects scalar values"),
+            }
+        }
     }
+}
+
+fn smooth_abs(x: f32, p: f32) -> f32 {
+    (x * x + p).sqrt()
 }

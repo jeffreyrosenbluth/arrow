@@ -67,6 +67,9 @@ pub enum FunctionName {
     Rot0,
     Rot1,
     Triangle,
+    Corner,
+    SmoothAbs,
+    SmoothClamp,
 }
 
 #[derive(Debug, Clone, Serialize)]

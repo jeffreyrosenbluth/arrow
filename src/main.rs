@@ -103,21 +103,28 @@ fn main() {
     use arrow::parser::*;
     let background = 0.75;
     // let mut input = "U(L(x+28,y-10,z+8)-12, don(x-cl(x,-15,15),y-18,z-20,10,3), bx3(x-20,y-20,z+20,8)-5, L(x+3,y-16)-2)";
-    // let mut input2 = "don(x,y-3,mod(z,8)-4,8,1)";
-    // let mut input2 = "don(x,y-2,z,5,1)";
-    // let mut input3 = "s=10; @1{a=sin(y),b=sin(x),c=sin(z),d=x,e=s+1,}; SM(a,b,c,d,e)-5";
-    let mut input4 = "L(B(B(x)-3)-3,B(y)-3)-2";
-    let ast = program(&mut input4).unwrap();
+    // let mut input = "don(x,y-3,mod(z,8)-4,8,1)";
+    // let mut input = "don(x,y-2,z,5,1)";
+    // let mut input = "s=10; @1{a=sin(y),b=sin(x),c=sin(z),d=x,e=s+1,}; SM(a,b,c,d,e)-5";
+    // let mut input = "L(B(B(x)-3)-3,B(y)-3)-2";
+    // let mut input = "bx3(x,y-5,z-5,7,4,4)-5";
+    // let mut input = "L(k(x,y-10),z)-5";
+    // let mut input = "L(x,TR(y))-.5";
+    // let mut input =
+    // "U( bx3(mod(x,4)-2,y,z,6), bx3(x,y,mod(x,4)-2,6), L(TR(x),y)-1, L(x+20,y-20,z-20)-8)";
+    // let mut input = "[x,z]=r0(x-20,z), bx3(x,mod(y,1)-.5,mod(z,1)-.5,.45)";
+    let mut input = "";
+    let ast = program(&mut input).unwrap();
     let sdf: Sdf = Box::new(move |p| make_sdf(&ast, p));
-    let plane = sd_plane(v3(0.0, 0.85, 0.3), 10.0, I);
-    let sdf = union(sdf, plane);
+    // let plane = sd_plane(v3(0.0, 0.85, 0.3), 10.0, I);
+    // let sdf = union(sdf, plane);
     let img_data = render(
         &sdf,
         v3(5.0, 15.0, -30.0),
         v3(-5.0, -5.0, 0.0),
         &vec![
             Light::new(v3(-2.0, 5.0, -6.0), 0.6),
-            Light::new(v3(5.0, 15.0, -6.0), 0.3),
+            Light::new(v3(5.0, 10.0, -6.0), 0.3),
         ],
         background,
         WIDTH,

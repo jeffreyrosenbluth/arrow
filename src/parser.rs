@@ -152,10 +152,6 @@ fn block(i: &mut &str) -> PResult<Statement> {
     opt(",").parse_next(i)?;
     rbrace.parse_next(i)?;
     Ok(block)
-    // if let Statement::Sequence(stmts) = block {
-    //     return Ok(stmts);
-    // }
-    // fail(i)
 }
 
 fn for_numeric(i: &mut &str) -> PResult<Statement> {
@@ -302,7 +298,10 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "r0".map(|_| Rot0),
             "r1".map(|_| Rot1),
             "TR".map(|_| Triangle),
-            // 18..=21
+            "k".map(|_| Corner),
+            "sB".map(|_| SmoothAbs),
+            "scl".map(|_| SmoothClamp),
+            // 21
         )),
     ))
     .parse_next(i)
