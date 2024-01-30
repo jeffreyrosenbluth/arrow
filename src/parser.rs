@@ -294,6 +294,7 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "Z".map(|_| Floors),
             "nz".map(|_| ValueNoise),
             "don".map(|_| Torus),
+            "bx2".map(|_| Box2),
             "bx3".map(|_| Box3),
             "r0".map(|_| Rot0),
             "r1".map(|_| Rot1),
@@ -301,7 +302,6 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "k".map(|_| Corner),
             "sB".map(|_| SmoothAbs),
             "scl".map(|_| SmoothClamp),
-            // 21
         )),
     ))
     .parse_next(i)
@@ -326,6 +326,7 @@ fn function(i: &mut &str) -> PResult<Expr> {
 }
 
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
     // use serde_json::to_string;
     //     if let Ok((_, s)) = statements.parse_peek(input) {

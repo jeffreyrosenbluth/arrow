@@ -62,6 +62,7 @@ pub enum FunctionName {
     AddMul,
     ValueNoise,
     Torus,
+    Box2,
     Box3,
     Floors,
     Rot0,

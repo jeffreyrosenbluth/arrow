@@ -105,7 +105,6 @@ fn main() {
     // let mut input = "U(L(x+28,y-10,z+8)-12, don(x-cl(x,-15,15),y-18,z-20,10,3), bx3(x-20,y-20,z+20,8)-5, L(x+3,y-16)-2)";
     // let mut input = "don(x,y-3,mod(z,8)-4,8,1)";
     // let mut input = "don(x,y-2,z,5,1)";
-    // let mut input = "s=10; @1{a=sin(y),b=sin(x),c=sin(z),d=x,e=s+1,}; SM(a,b,c,d,e)-5";
     // let mut input = "L(B(B(x)-3)-3,B(y)-3)-2";
     // let mut input = "bx3(x,y-5,z-5,7,4,4)-5";
     // let mut input = "L(k(x,y-10),z)-5";
@@ -113,7 +112,7 @@ fn main() {
     // let mut input =
     // "U( bx3(mod(x,4)-2,y,z,6), bx3(x,y,mod(x,4)-2,6), L(TR(x),y)-1, L(x+20,y-20,z-20)-8)";
     // let mut input = "[x,z]=r0(x-20,z), bx3(x,mod(y,1)-.5,mod(z,1)-.5,.45)";
-    let mut input = "";
+    let mut input = "r=B(x,y,z,4,3)-4, s=1; @4{ @xyz{$=(mod($+9,18)-9)*3,}, s/=3, r=k(r,-U(@xyz{bx2($,$$,9),})*s),}r";
     let ast = program(&mut input).unwrap();
     let sdf: Sdf = Box::new(move |p| make_sdf(&ast, p));
     // let plane = sd_plane(v3(0.0, 0.85, 0.3), 10.0, I);

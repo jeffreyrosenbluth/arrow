@@ -38,12 +38,27 @@ pub fn eval(env: &mut Environment, ast: &Statement, v: Vec3) {
         Statement::ForNumeric { n, block } => {
             for i in 0..*n {
                 env.insert("$".to_string(), ScalarVal(i as f32));
+                env.insert("$$".to_string(), ScalarVal(((i + 1) % n) as f32));
+                env.insert("$$$".to_string(), ScalarVal(((i + 2) % n) as f32));
                 eval(env, block, v);
             }
         }
         Statement::ForAlpha { a, block } => {
-            for c in a.chars() {
-                env.insert("$".to_string(), env.get(&c.to_string()).unwrap().clone());
+            let cs = a.chars().collect::<Vec<_>>();
+            let n = cs.len();
+            for i in 0..n {
+                env.insert(
+                    "$".to_string(),
+                    env.get(&cs[i].to_string()).unwrap().clone(),
+                );
+                env.insert(
+                    "$$".to_string(),
+                    env.get(&cs[(i + 1) % n].to_string()).unwrap().clone(),
+                );
+                env.insert(
+                    "$$$".to_string(),
+                    env.get(&cs[(i + 2) % n].to_string()).unwrap().clone(),
+                );
                 eval(env, block, v);
             }
         }
@@ -267,24 +282,20 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
             }
         }
         Clamp => {
-            let arg0 = eval_expr(env, Box::new(args[0].clone()));
-            let arg1 = eval_expr(env, Box::new(args[1].clone()));
-            let arg2 = eval_expr(env, Box::new(args[2].clone()));
-            match (arg0, arg1, arg2) {
-                (ScalarVal(arg0), ScalarVal(arg1), ScalarVal(arg2)) => {
-                    ScalarVal(arg0.max(arg1).min(arg2))
-                }
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let a = eval_expr(env, Box::new(args[1].clone()));
+            let b = eval_expr(env, Box::new(args[2].clone()));
+            match (x, a, b) {
+                (ScalarVal(x), ScalarVal(a), ScalarVal(b)) => ScalarVal(x.max(a).min(b)),
                 _ => panic!("clamp expects scalar values"),
             }
         }
         Mix => {
-            let arg0 = eval_expr(env, Box::new(args[0].clone()));
-            let arg1 = eval_expr(env, Box::new(args[1].clone()));
-            let arg2 = eval_expr(env, Box::new(args[2].clone()));
-            match (arg0, arg1, arg2) {
-                (ScalarVal(arg0), ScalarVal(arg1), ScalarVal(arg2)) => {
-                    ScalarVal(arg0 * (1.0 - arg2) + arg1 * arg2)
-                }
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let y = eval_expr(env, Box::new(args[1].clone()));
+            let t = eval_expr(env, Box::new(args[2].clone()));
+            match (x, y, t) {
+                (ScalarVal(x), ScalarVal(y), ScalarVal(t)) => ScalarVal(x * (1.0 - t) + y * t),
                 _ => panic!("mix expects scalar values"),
             }
         }
@@ -301,17 +312,15 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
             }
         }
         Length => {
-            let arg0 = eval_expr(env, Box::new(args[0].clone()));
-            let arg1 = eval_expr(env, Box::new(args[1].clone()));
-            let arg2 = if args.len() > 2 {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let y = eval_expr(env, Box::new(args[1].clone()));
+            let z = if args.len() > 2 {
                 eval_expr(env, Box::new(args[2].clone()))
             } else {
                 ScalarVal(0.0)
             };
-            match (arg0, arg1, arg2) {
-                (ScalarVal(arg0), ScalarVal(arg1), ScalarVal(arg2)) => {
-                    ScalarVal(v3(arg0, arg1, arg2).length())
-                }
+            match (x, y, z) {
+                (ScalarVal(x), ScalarVal(y), ScalarVal(z)) => ScalarVal(v3(x, y, z).length()),
                 _ => panic!("length expects scalar values"),
             }
         }
@@ -424,22 +433,60 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
             max.unwrap().clone()
         }
         AddMul => {
-            todo!()
-            // let arg0 = eval_expr(env, Box::new(args[0].clone()));
-            // let arg1 = eval_expr(env, Box::new(args[1].clone()));
-            // let arg2 = if args.len() > 1 {
-            //     eval_expr(env, Box::new(args[2].clone()))
-            // } else {
-            //     0.0
-            // };
-            // match (arg0, arg1, arg2) {
-            //     (ScalarVal(arg0), ScalarVal(arg1), ScalarVal(arg2)) => {
-            //         ScalarVal(arg0 + arg1 * arg2)
-            //     }
-            //     _ => panic!("addmul expects scalar values"),
-            // }
+            let (x, y, z, a, b, c, t) = if args.len() == 4 {
+                (
+                    eval_expr(env, Box::new(args[0].clone())),
+                    eval_expr(env, Box::new(args[1].clone())),
+                    ScalarVal(0.0),
+                    eval_expr(env, Box::new(args[2].clone())),
+                    eval_expr(env, Box::new(args[3].clone())),
+                    ScalarVal(0.0),
+                    ScalarVal(1.0),
+                )
+            } else if args.len() == 5 {
+                (
+                    eval_expr(env, Box::new(args[0].clone())),
+                    eval_expr(env, Box::new(args[1].clone())),
+                    ScalarVal(0.0),
+                    eval_expr(env, Box::new(args[2].clone())),
+                    eval_expr(env, Box::new(args[3].clone())),
+                    ScalarVal(0.0),
+                    eval_expr(env, Box::new(args[4].clone())),
+                )
+            } else if args.len() == 6 {
+                (
+                    eval_expr(env, Box::new(args[0].clone())),
+                    eval_expr(env, Box::new(args[1].clone())),
+                    eval_expr(env, Box::new(args[2].clone())),
+                    eval_expr(env, Box::new(args[3].clone())),
+                    eval_expr(env, Box::new(args[4].clone())),
+                    eval_expr(env, Box::new(args[5].clone())),
+                    ScalarVal(1.0),
+                )
+            } else {
+                (
+                    eval_expr(env, Box::new(args[0].clone())),
+                    eval_expr(env, Box::new(args[1].clone())),
+                    eval_expr(env, Box::new(args[2].clone())),
+                    eval_expr(env, Box::new(args[3].clone())),
+                    eval_expr(env, Box::new(args[4].clone())),
+                    eval_expr(env, Box::new(args[5].clone())),
+                    eval_expr(env, Box::new(args[6].clone())),
+                )
+            };
+            match (x, y, z, a, b, c, t) {
+                (
+                    ScalarVal(x),
+                    ScalarVal(y),
+                    ScalarVal(z),
+                    ScalarVal(a),
+                    ScalarVal(b),
+                    ScalarVal(c),
+                    ScalarVal(t),
+                ) => Vec3Val(v3(x + a * t, y + b * t, z + c * t)),
+                _ => panic!("addmul expects scalar values"),
+            }
         }
-        // A=([x,y,z=0],[a,b,c=0],t=1)=>[x+a*t,y+b*t,z+c*t]
         ValueNoise => todo!(),
         Torus => {
             let arg0 = eval_expr(env, Box::new(args[0].clone()));
@@ -461,6 +508,29 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                     ScalarVal(sdf(p))
                 }
                 _ => panic!("torus expects scalar values"),
+            }
+        }
+        // bx2=(x,y,a,b=a)=>(x=abs(x)-a,y=abs(y)-b,x>0&&y>0?L(x,y):x>y?x:y)
+        Box2 => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let y = eval_expr(env, Box::new(args[1].clone()));
+            let a = eval_expr(env, Box::new(args[2].clone()));
+            let b = if args.len() > 3 {
+                eval_expr(env, Box::new(args[3].clone()))
+            } else {
+                a
+            };
+            match (x, y, a, b) {
+                (ScalarVal(x), ScalarVal(y), ScalarVal(a), ScalarVal(b)) => {
+                    let x = x.abs() - a;
+                    let y = y.abs() - b;
+                    if x > 0.0 && y > 0.0 {
+                        ScalarVal(v3(x, y, 0.0).length())
+                    } else {
+                        ScalarVal(x.max(y))
+                    }
+                }
+                _ => panic!("box2 expects scalar values"),
             }
         }
         Box3 => {
