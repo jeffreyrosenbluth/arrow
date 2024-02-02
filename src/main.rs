@@ -112,17 +112,24 @@ fn main() {
     // let mut input =
     // "U( bx3(mod(x,4)-2,y,z,6), bx3(x,y,mod(x,4)-2,6), L(TR(x),y)-1, L(x+20,y-20,z-20)-8)";
     // let mut input = "[x,z]=r0(x-20,z), bx3(x,mod(y,1)-.5,mod(z,1)-.5,.45)";
-    let mut input = "r=B(x,y,z,4,3)-4, s=1; @4{ @xyz{$=(mod($+9,18)-9)*3,}, s/=3, r=k(r,-U(@xyz{bx2($,$$,9),})*s),}r";
+    // let mut input = "r=B(x,y,z,4,3)-4, s=1; @4{ @xyz{$=(mod($+9,18)-9)*3,}, s/=3, r=k(r,-U(@xyz{bx2($,$$,9),})*s),}r";
+    // let mut input = "@xyz{$=B($)-6,} L(x,y,z)-5";
+    let mut input = "s=1; @5{ @xyz{$=B($*2)-8,}, s*=.5, },(L(x,y,z)-8)*s";
     let ast = program(&mut input).unwrap();
+    // dbg!(&input, &ast);
     let sdf: Sdf = Box::new(move |p| make_sdf(&ast, p));
+    println!("sdf: {}", sdf(v3(0.0, 0.0, 100.0)));
     // let plane = sd_plane(v3(0.0, 0.85, 0.3), 10.0, I);
     // let sdf = union(sdf, plane);
     let img_data = render(
         &sdf,
-        v3(5.0, 15.0, -30.0),
-        v3(-5.0, -5.0, 0.0),
+        v3(0.0, 0.0, -50.0),
+        ZERO3,
+        // v3(5.0, 15.0, -30.0),
+        // v3(-5.0, -5.0, 0.0),
         &vec![
-            Light::new(v3(-2.0, 5.0, -6.0), 0.6),
+            Light::new(v3(0.0, 0.0, -26.0), 1.0),
+            // Light::new(v3(-2.0, 5.0, -6.0), 0.6),
             Light::new(v3(5.0, 10.0, -6.0), 0.3),
         ],
         background,

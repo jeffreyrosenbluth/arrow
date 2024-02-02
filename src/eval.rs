@@ -65,6 +65,7 @@ pub fn eval(env: &mut Environment, ast: &Statement, v: Vec3) {
         Statement::Return(expr) => {
             let _ = eval_expr(env, expr.clone());
         }
+        Statement::Empty => {}
     }
 }
 

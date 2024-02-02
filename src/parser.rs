@@ -2,7 +2,7 @@ use crate::ast::*;
 use winnow::ascii::{alpha1, alphanumeric0, dec_uint};
 use winnow::combinator::{fail, opt, preceded, separated};
 use winnow::prelude::*;
-use winnow::token::{take, take_until};
+use winnow::token::take;
 use winnow::{
     ascii::{float, multispace0 as multispaces},
     combinator::{alt, delimited, fold_repeat},
@@ -29,10 +29,18 @@ fn comma<'a>(i: &mut &'a str) -> PResult<&'a str> {
     delimited(multispaces, ",", multispaces).parse_next(i)
 }
 
+pub fn program(i: &mut &str) -> PResult<Statement> {
+    let s = separated(1.., statement, alt((",", ";")))
+        .map(|stmts| Statement::Sequence(stmts))
+        .parse_next(i)?;
+    Ok(s)
+}
+
 fn statement(i: &mut &str) -> PResult<Statement> {
     delimited(
         multispaces,
         alt((
+            rbrace.map(|_| Statement::Empty),
             for_numeric,
             for_alpha,
             assign_array,
@@ -48,13 +56,6 @@ fn statement(i: &mut &str) -> PResult<Statement> {
         multispaces,
     )
     .parse_next(i)
-}
-
-pub fn program(i: &mut &str) -> PResult<Statement> {
-    let s = separated(1.., statement, alt((",", ";")))
-        .map(|stmts| Statement::Sequence(stmts))
-        .parse_next(i)?;
-    Ok(s)
 }
 
 fn assign_scalar(i: &mut &str) -> PResult<Statement> {
@@ -95,7 +96,7 @@ fn assign_add(i: &mut &str) -> PResult<Statement> {
 fn assign_sub(i: &mut &str) -> PResult<Statement> {
     use crate::ast::BinOp::*; // Not sure why this is needed, otherwise it complains about Sub not being in scope.
     let var = identifier.parse_next(i)?;
-    delimited(multispaces, "+=", multispaces).parse_next(i)?;
+    delimited(multispaces, "-=", multispaces).parse_next(i)?;
     let rhs = expr.parse_next(i)?;
     Ok(Statement::Assign {
         var: var.clone(),
@@ -109,7 +110,7 @@ fn assign_sub(i: &mut &str) -> PResult<Statement> {
 fn assign_mul(i: &mut &str) -> PResult<Statement> {
     use crate::ast::BinOp::*; // Not sure why this is needed, otherwise it complains about Mul not being in scope.
     let var = identifier.parse_next(i)?;
-    delimited(multispaces, "+=", multispaces).parse_next(i)?;
+    delimited(multispaces, "*=", multispaces).parse_next(i)?;
     let rhs = expr.parse_next(i)?;
     Ok(Statement::Assign {
         var: var.clone(),
@@ -123,7 +124,7 @@ fn assign_mul(i: &mut &str) -> PResult<Statement> {
 fn assign_div(i: &mut &str) -> PResult<Statement> {
     use crate::ast::BinOp::*; // Not sure why this is needed, otherwise it complains about Div not being in scope.
     let var = identifier.parse_next(i)?;
-    delimited(multispaces, "+=", multispaces).parse_next(i)?;
+    delimited(multispaces, "/=", multispaces).parse_next(i)?;
     let rhs = expr.parse_next(i)?;
     Ok(Statement::Assign {
         var: var.clone(),
@@ -147,11 +148,7 @@ fn assign_inc(i: &mut &str) -> PResult<Statement> {
 }
 
 fn block(i: &mut &str) -> PResult<Statement> {
-    lbrace.parse_next(i)?;
-    let block = take_until(0.., ",}").and_then(program).parse_next(i)?;
-    opt(",").parse_next(i)?;
-    rbrace.parse_next(i)?;
-    Ok(block)
+    preceded(lbrace, program).parse_next(i)
 }
 
 fn for_numeric(i: &mut &str) -> PResult<Statement> {

@@ -8,6 +8,7 @@ pub enum Statement {
     ForNumeric { n: u32, block: Box<Statement> },
     ForAlpha { a: String, block: Box<Statement> },
     Return(Box<Expr>),
+    Empty,
 }
 
 #[derive(Debug, Clone, Serialize)]
