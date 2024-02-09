@@ -5,8 +5,6 @@ pub enum Statement {
     Assign { var: String, rhs: Box<Expr> },
     AssignArray { vars: Vec<String>, rhs: Box<Expr> },
     Sequence(Vec<Statement>),
-    ForNumeric { n: u32, block: Box<Statement> },
-    ForAlpha { a: String, block: Box<Statement> },
     Return(Box<Expr>),
     Empty,
 }

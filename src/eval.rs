@@ -12,7 +12,7 @@ pub enum Value {
     Vec3Val(Vec3),
 }
 
-type Environment = HashMap<String, Value>;
+pub type Environment = HashMap<String, Value>;
 
 pub fn eval(env: &mut Environment, ast: &Statement, v: Vec3) {
     use Value::*;
@@ -33,33 +33,6 @@ pub fn eval(env: &mut Environment, ast: &Statement, v: Vec3) {
         Statement::Sequence(stmts) => {
             for s in stmts {
                 eval(env, s, v);
-            }
-        }
-        Statement::ForNumeric { n, block } => {
-            for i in 0..*n {
-                env.insert("$".to_string(), ScalarVal(i as f32));
-                env.insert("$$".to_string(), ScalarVal(((i + 1) % n) as f32));
-                env.insert("$$$".to_string(), ScalarVal(((i + 2) % n) as f32));
-                eval(env, block, v);
-            }
-        }
-        Statement::ForAlpha { a, block } => {
-            let cs = a.chars().collect::<Vec<_>>();
-            let n = cs.len();
-            for i in 0..n {
-                env.insert(
-                    "$".to_string(),
-                    env.get(&cs[i].to_string()).unwrap().clone(),
-                );
-                env.insert(
-                    "$$".to_string(),
-                    env.get(&cs[(i + 1) % n].to_string()).unwrap().clone(),
-                );
-                env.insert(
-                    "$$$".to_string(),
-                    env.get(&cs[(i + 2) % n].to_string()).unwrap().clone(),
-                );
-                eval(env, block, v);
             }
         }
         Statement::Return(expr) => {
