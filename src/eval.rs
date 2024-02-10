@@ -16,9 +16,15 @@ pub type Environment = HashMap<String, Value>;
 
 pub fn eval(env: &mut Environment, ast: &Statement, v: Vec3) {
     use Value::*;
-    env.insert("x".to_string(), ScalarVal(v.x));
-    env.insert("y".to_string(), ScalarVal(v.y));
-    env.insert("z".to_string(), ScalarVal(v.z));
+    if !env.contains_key("x") {
+        env.insert("x".to_string(), ScalarVal(v.x));
+    }
+    if !env.contains_key("y") {
+        env.insert("y".to_string(), ScalarVal(v.y));
+    }
+    if !env.contains_key("z") {
+        env.insert("z".to_string(), ScalarVal(v.z));
+    }
     match &ast {
         Statement::Assign { var, rhs } => {
             let r = eval_expr(env, rhs.clone());

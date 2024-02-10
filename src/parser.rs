@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::expand::expand_macro;
+use crate::expand::expand;
 
 use winnow::ascii::{alpha1, alphanumeric0};
 use winnow::combinator::{fail, opt, separated};
@@ -28,7 +28,7 @@ fn comma<'a>(i: &mut &'a str) -> PResult<&'a str> {
 }
 
 pub fn program(i: &mut &str) -> PResult<Statement> {
-    let mut i_str: &str = &expand_macro(i);
+    let mut i_str: &str = &expand(i);
     let j = &mut i_str;
     let s = separated(1.., statement, alt((",", ";")))
         .map(|stmts| Statement::Sequence(stmts))

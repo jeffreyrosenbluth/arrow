@@ -1,37 +1,35 @@
-pub fn expand_macro(input: &str) -> String {
+pub fn expand(input: &str) -> String {
+    let mut in_chars = input.chars();
     let mut output = String::new();
-    let mut i = 0;
-    while i < input.len() {
-        let mut current_char = input.chars().nth(i).unwrap();
-        if current_char == '@' {
-            i += 1; // Move past '@'
+    let mut current_char = in_chars.next();
+    while let Some(c) = current_char {
+        if c == '@' {
             let mut macro_type = String::new();
-            while i < input.len() && input.chars().nth(i).unwrap() != '{' {
-                macro_type.push(input.chars().nth(i).unwrap());
-                i += 1;
+            while let Some(c) = in_chars.next() {
+                if c == '{' {
+                    break;
+                }
+                macro_type.push(c);
             }
-            i += 1; // Move past '{'
             let mut content = String::new();
             let mut depth = 1;
-            while i < input.len() && depth > 0 {
-                current_char = input.chars().nth(i).unwrap();
-                if current_char == '{' {
+            while let Some(c) = in_chars.next() {
+                if c == '{' {
                     depth += 1;
-                } else if current_char == '}' {
+                } else if c == '}' {
                     depth -= 1;
                     if depth == 0 {
-                        break; // Don't include the closing '}' in content
+                        break;
                     }
                 }
-                content.push(current_char);
-                i += 1;
+                content.push(c);
             }
-            let expanded_content = expand_macro(&content); // Handle nested macros
+            let expanded_content = expand(&content);
             output += &process_macro(&macro_type, &expanded_content);
         } else {
-            output.push(current_char);
+            output.push(c);
         }
-        i += 1;
+        current_char = in_chars.next();
     }
     output
 }
@@ -60,10 +58,10 @@ mod tests {
     fn expand_test() {
         let input =
             "s=1; @2{ [x,y]=r0(x,y), [x,z]=r1(x * $,z), @xyz{$=B($*2)-8,} s*=.5,} (L(x,y,z)-8)*s";
-        dbg!(expand_macro(input));
+        dbg!(expand(input));
         let input = "s=10; @1{a=sin(y),b=sin(x),c=sin(z),d=x,e=s+1,}; SM(a,b,c,d,e)-5";
-        dbg!(expand_macro(input));
+        dbg!(expand(input));
         let input = "@xyz{$=B($)-6,} L(x,y,z)-5";
-        dbg!(expand_macro(input));
+        dbg!(expand(input));
     }
 }
