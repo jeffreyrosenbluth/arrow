@@ -63,5 +63,7 @@ mod tests {
         dbg!(expand(input));
         let input = "@xyz{$=B($)-6,} L(x,y,z)-5";
         dbg!(expand(input));
+        let input = "s=2.5,h=s/2,d=(s+h)/2,q=20,y-=10,[x,y]=r0(x,y),@xyz{$/=q,}c=1,t=0,@7{@xyz{$=mod($-h,s)-h,}t=d/D([x,y,z],[x,y,z]),@xyzc{$*=t,}}d=L(x,y,z)/c*2.-.025";
+        dbg!(expand(input));
     }
 }

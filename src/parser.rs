@@ -7,7 +7,7 @@ use winnow::prelude::*;
 use winnow::token::take;
 use winnow::{
     ascii::{float, multispace0 as multispaces},
-    combinator::{alt, delimited, fold_repeat},
+    combinator::{alt, delimited, repeat},
     token::one_of,
 };
 
@@ -157,38 +157,36 @@ fn sum(i: &mut &str) -> PResult<Expr> {
     use BinOp::*;
     let init = product.parse_next(i)?;
 
-    fold_repeat(
-        0..,
-        (one_of(['+', '-']), product),
-        move || init.clone(),
-        |acc, (op, val): (char, Expr)| {
-            if op == '+' {
-                Expr::BinaryOp(Add(Box::new(acc), Box::new(val)))
-            } else {
-                Expr::BinaryOp(Sub(Box::new(acc), Box::new(val)))
-            }
-        },
-    )
-    .parse_next(i)
+    repeat(0.., (one_of(['+', '-']), product))
+        .fold(
+            move || init.clone(),
+            |acc, (op, val): (char, Expr)| {
+                if op == '+' {
+                    Expr::BinaryOp(Add(Box::new(acc), Box::new(val)))
+                } else {
+                    Expr::BinaryOp(Sub(Box::new(acc), Box::new(val)))
+                }
+            },
+        )
+        .parse_next(i)
 }
 
 fn product(i: &mut &str) -> PResult<Expr> {
     use BinOp::*;
     let init = scalar.parse_next(i)?;
 
-    fold_repeat(
-        0..,
-        (one_of(['*', '/']), scalar),
-        move || init.clone(),
-        |acc, (op, val): (char, Expr)| {
-            if op == '*' {
-                Expr::BinaryOp(Mul(Box::new(acc), Box::new(val)))
-            } else {
-                Expr::BinaryOp(Div(Box::new(acc), Box::new(val)))
-            }
-        },
-    )
-    .parse_next(i)
+    repeat(0.., (one_of(['*', '/']), scalar))
+        .fold(
+            move || init.clone(),
+            |acc, (op, val): (char, Expr)| {
+                if op == '*' {
+                    Expr::BinaryOp(Mul(Box::new(acc), Box::new(val)))
+                } else {
+                    Expr::BinaryOp(Div(Box::new(acc), Box::new(val)))
+                }
+            },
+        )
+        .parse_next(i)
 }
 
 fn scalar(i: &mut &str) -> PResult<Expr> {
@@ -220,7 +218,7 @@ fn identifier(i: &mut &str) -> PResult<String> {
 }
 
 fn variable(i: &mut &str) -> PResult<Expr> {
-    identifier.map(Expr::Variable).parse_next(i)
+    identifier.map(|v| Expr::Variable(v)).parse_next(i)
 }
 
 // Math LN10 LN2 LOG10E LOG2E SQRT1_2 SQRT2 abs acos acosh asin asinh atan atan2 atanh cbrt ceil
@@ -276,6 +274,7 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "sB".map(|_| SmoothAbs),
             "scl".map(|_| SmoothClamp),
         )),
+        alt(("r0".map(|_| Rot0), "r1".map(|_| Rot1))),
     ))
     .parse_next(i)
 }
@@ -286,8 +285,17 @@ fn parens(i: &mut &str) -> PResult<Expr> {
         .parse_next(i)
 }
 
+fn list(i: &mut &str) -> PResult<Vec<Expr>> {
+    delimited(lbracket, separated(0.., expr, ","), rbracket).parse_next(i)
+}
+
+fn arg_list(i: &mut &str) -> PResult<Vec<Expr>> {
+    let ls: Vec<Vec<Expr>> = separated(1.., list, ",").parse_next(i)?;
+    Ok(ls.into_iter().flatten().collect())
+}
+
 fn args(i: &mut &str) -> PResult<Vec<Expr>> {
-    separated(0.., expr, ",").parse_next(i)
+    alt((arg_list, separated(0.., expr, ","))).parse_next(i)
 }
 
 fn function(i: &mut &str) -> PResult<Expr> {
@@ -307,6 +315,13 @@ mod tests {
     //         println!("serialized = {}", serialized);
     //     }
 
+    #[test]
+    fn tt() {
+        // let input = "s=1;@5{@xyz{$=B($*2)-8,}s*=.5,}(L(x,y,z)-8)*s";
+        let input = "s=2.5,h=s/2,d=(s+h)/2,q=20,y-=10,[x,y]=r0(x,y),@xyz{$/=q,}c=1,t=0,@7{@xyz{$=mod($-h,s)-h,}t=d/D([x,y,z],[x,y,z]),@xyzc{$*=t,}}d=L(x,y,z)/c*2.-.025";
+        // let input = "D([x,y,z],[x,y,z])";
+        dbg!(program.parse_peek(input));
+    }
     #[test]
     fn no_more_ray() {
         let input = "U(L(x+28,y-10,z+8)-12, don(x-cl(x,-15,15),y-18,z-20,10,3), bx3(x-20,y-20,z+20,8)-10, L(x+3,y-16)-4)";
@@ -399,10 +414,10 @@ mod tests {
             expected
         );
 
-        let input = "@xyz{$=B($)-6,}";
+        let input = "@xyz{$=B($)-6,} L(x,y,z)-5";
         let expected = Ok((
             input,
-            String::from("Sequence([ForAlpha { a: \"xyz\", block: Sequence([Assign { var: \"$\", rhs: BinaryOp(Sub(Function { name: Abs, args: [Variable(\"$\")] }, Scalar(6.0))) }]) }])")),
+            String::from("Sequence([Assign { var: \"x\", rhs: BinaryOp(Sub(Function { name: Abs, args: [Variable(\"x\")] }, Scalar(6.0))) }, Assign { var: \"y\", rhs: BinaryOp(Sub(Function { name: Abs, args: [Variable(\"y\")] }, Scalar(6.0))) }, Assign { var: \"z\", rhs: BinaryOp(Sub(Function { name: Abs, args: [Variable(\"z\")] }, Scalar(6.0))) }, Return(BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\")] }, Scalar(5.0))))])")),
         );
         assert_eq!(
             program.map(|e| format!("{e:?}")).parse_peek(input),

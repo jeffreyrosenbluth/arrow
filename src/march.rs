@@ -89,7 +89,7 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Lum) -> Lu
         }
         total_dist += dist;
     }
-    return background;
+    background
 }
 
 pub fn render(

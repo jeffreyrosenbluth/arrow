@@ -1,8 +1,21 @@
 use crate::ast::*;
 use crate::core::{modulo, v3, I, ZERO3};
 use crate::sdf::{sd_box, sd_torus};
-use glam::{Vec2, Vec3};
+use glam::{Mat2, Vec2, Vec3};
 use std::collections::HashMap;
+use std::f32::consts::TAU;
+
+pub fn make_sdf(ast: &Statement, a0: f32, a1: f32, p: Vec3) -> f32 {
+    let mut env = HashMap::new();
+    env.insert("a0".to_string(), Value::ScalarVal(a0));
+    env.insert("a1".to_string(), Value::ScalarVal(a1));
+    eval(&mut env, &ast, p);
+    let v = env.get("#").unwrap();
+    match v {
+        Value::ScalarVal(s) => *s,
+        _ => panic!("sd is not a scalar"),
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Value {
@@ -32,8 +45,18 @@ pub fn eval(env: &mut Environment, ast: &Statement, v: Vec3) {
         }
         Statement::AssignArray { vars, rhs } => {
             let value = eval_expr(env, rhs.clone());
-            for var in vars {
-                env.insert(var.clone(), value);
+            match value {
+                Vec2Val(v) => {
+                    env.insert(vars[0].clone(), ScalarVal(v.x));
+                    env.insert(vars[1].clone(), ScalarVal(v.y));
+                }
+                ScalarVal(_) => panic!("assign array expects vector values"),
+                BoolVal(_) => panic!("assign array expects vector values"),
+                Vec3Val(v) => {
+                    env.insert(vars[0].clone(), ScalarVal(v.x));
+                    env.insert(vars[1].clone(), ScalarVal(v.y));
+                    env.insert(vars[2].clone(), ScalarVal(v.z));
+                }
             }
         }
         Statement::Sequence(stmts) => {
@@ -61,7 +84,6 @@ fn eval_expr(env: &mut Environment, ast: Box<Expr>) -> Value {
             env.insert("#".to_string(), r);
             r
         }
-        Expr::UnaryOp => todo!(),
         Expr::Paren(expr) => {
             let r = eval_expr(env, expr);
             env.insert("#".to_string(), r);
@@ -546,8 +568,34 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
             }
         }
         Floors => todo!(),
-        Rot0 => todo!(),
-        Rot1 => todo!(),
+        Rot0 => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let y = eval_expr(env, Box::new(args[1].clone()));
+            let a = env.get("a0").unwrap();
+            match (x, y, a) {
+                (ScalarVal(x), ScalarVal(y), ScalarVal(a)) => {
+                    let v = Vec2::new(x, y);
+                    let a = a * TAU;
+                    let m = Mat2::from_angle(a);
+                    Vec2Val(m * v)
+                }
+                _ => panic!("rot0 expects scalar values"),
+            }
+        }
+        Rot1 => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let y = eval_expr(env, Box::new(args[1].clone()));
+            let a = env.get("a1").unwrap();
+            match (x, y, a) {
+                (ScalarVal(x), ScalarVal(y), ScalarVal(a)) => {
+                    let v = Vec2::new(x, y);
+                    let a = a * TAU;
+                    let m = Mat2::from_angle(a);
+                    Vec2Val(m * v)
+                }
+                _ => panic!("rot1 expects scalar values"),
+            }
+        }
         Triangle => {
             let arg0 = eval_expr(env, Box::new(args[0].clone()));
             match arg0 {
