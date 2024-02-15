@@ -1,12 +1,10 @@
 use std::{f32::consts::PI, vec};
 
-use arrow::ast::Statement;
 use arrow::core::*;
 use arrow::eval::*;
 use arrow::march::render;
 use arrow::sdf::*;
 use glam::{Affine3A, Vec2, Vec3};
-use std::collections::HashMap;
 
 const WIDTH: u32 = 1024;
 const HEIGHT: u32 = 768;
@@ -101,26 +99,30 @@ fn main() {
     // let mut fence = "L(x,TR(y))-.5";
     // let mut cross =
     //     "U( bx3(mod(x,4)-2,y,z,6), bx3(x,y,mod(x,4)-2,6), L(TR(x),y)-1, L(x+20,y-20,z-20)-8)";
-    let mut input = "[x,z]=r0(x-20,z), bx3(x,mod(y,1)-.5,mod(z,1)-.5,.45)";
+    // let mut input = "[x,z]=r0(x-20,z); bx3(x,mod(y,1)-.5,mod(z,1)-.5,1.15)";
     // let mut input = "r=B(x,y,z,4,3)-4, s=1; @4{ @xyz{$=(mod($+9,18)-9)*3,}, s/=3, r=k(r,-U(@xyz{bx2($,$$,9),})*s),}r";
     // let mut balls8a = "@xyz{$=B($)-6,} L(x,y,z)-5";
     // let mut balls8b = "L(B(x)-6, B(y)-6, B(z)-6) - 5";
-    // let mut box_of_balls = "s=1; @5{@xyz{$=B($*2)-8,} s*=.5,} (L(x,y,z)-8)*s";
+    let mut box_of_balls =
+        "s=1; @5{ [x,y]=r0(x,y), [x,z]=r1(x,z), @xyz{$=B($*2)-8,} s*=.5; } (L(x,y,z)-8)*s";
     // let mut input = "s=10,[x,z]=r0(x,z),[y,z]=r1(z,y),[y,x]=r0(y,x),@xyz{$m=mod($,1)-.5,}b=bx3(xm,ym,zm,.45)-.05,t=[0,2,3,1],i=1,n=(a=i++)=>nz(z,x,y,.01,a,a==1?2:1)*t[a]*100,@yxz{$+=n(),}@xz{$b=mod($,s*2)-s,}rG(b,bx2(bx2(xb,zb,s),TR((y+2)/40)*40,1,2.2)-.2,.3)-.1";
     // let mut input= "d=99,l=10, x-=l*2, y-=l,z+=2.5, @3{ x+=l, a=a0*($+2),s=sin(a),c=cos(a), [x1,y1]=rot(x,y,s,c), a=a1*($+2),s=sin(a),c=cos(a), [x1,z1]=rot(x1,z,s,c), d=rU(d, bx3(x1,y1,z1,4),3), } U(d+.5, L(nz(x,y,z,.5,1,6)-.5, abs(d)-.1)-.4)";
     // let mut  apollonius = "s=2.5,h=s/2,d=(s+h)/2,q=20,y-=10,[x,y]=r0(x,y),@xyz{$/=q,}c=1,t=0,@7{@xyz{$=mod($-h,s)-h,}t=d/D([x,y,z],[x,y,z]),@xyzc{$*=t,}}d=L(x,y,z)/c*2.-.025";
-    let mut rot_cube = "[a,b]=r0(x,y-9); bx3(a,b,z,4)-.5";
-    let ast = program(&mut rot_cube).unwrap();
+    // let mut rot_cube = "[a,b]=r0(x,y-9); bx3(a,b,z,4)-.5";
+    let mut hyperplane = "a=(2*x-3*z+6*y)/7,b=(7*x-2*z+26*y)/27,c=(6*z-3*x+22*y)/23,d=0,zz=0;[x,z]=r1(x,z+8),[x,y]=r0(x,y),y-=3,zz=FR(z/26-.55)*26-13,d=SM(9,-12,y+3-z*.3),U(k(k(k(bx3(x,y-5,zz,7,14,7)-1,@abc{d-B(TR($))),}L(x+99,y+445,z+32)-434)";
+    let mut desire = "[x,y]=r0(x,y-1), [x,z]=r1(x,z), yb=B(y)-22.5, U(rG(32-k(0-y-13,z-15),TR(x*.25)*4-2+4*SM(0,16,x),4),rG( B(B(L(L(x,z)-16,yb-cl(yb,-8.5,8.5))-8)-4)-2, B(B(L(B(x)-15,B(B(y)-15)-15,B(z)-15)-9)-4)-2,1 ))";
+    let ast = program(&mut desire).unwrap();
     dbg!(&ast);
-    let sdf: Sdf = Box::new(move |p| make_sdf(&ast, 0.125 / 2.0, 0.0, p));
+    let sdf: Sdf = Box::new(move |p| make_sdf(&ast, 0.1, 0.2, p));
     println!("sdf: {}", sdf(v3(0.0, 0.0, -100.0)));
     // let plane = sd_plane(v3(0.0, 0.85, 0.3), 10.0, I);
     // let sdf = union(sdf, plane);
     let img_data = render(
         &sdf,
-        v3(0.0, 0.0, -30.0),
-        ZERO3,
-        // v3(5.0, 15.0, -30.0),
+        v3(0.0, 0.0, -77.0),
+        v3(20.0, -15.0, 0.0),
+        // ZERO3,
+        // v3(5.0, 15.0, -60.0),
         // v3(-5.0, -5.0, 0.0),
         &vec![
             Light::new(v3(0.0, 0.0, -26.0), 1.0),

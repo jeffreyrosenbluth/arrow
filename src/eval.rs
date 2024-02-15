@@ -159,11 +159,53 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 _ => panic!("sin expects scalar values"),
             }
         }
+        Asin => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.asin()),
+                _ => panic!("asin expects scalar values"),
+            }
+        }
+        Sinh => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.sinh()),
+                _ => panic!("sinh expects scalar values"),
+            }
+        }
+        Asinh => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.asinh()),
+                _ => panic!("asinh expects scalar values"),
+            }
+        }
         Cos => {
             let x = eval_expr(env, Box::new(args[0].clone()));
             match x {
                 ScalarVal(x) => ScalarVal(x.cos()),
                 _ => panic!("cos expects scalar values"),
+            }
+        }
+        Acos => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.acos()),
+                _ => panic!("acos expects scalar values"),
+            }
+        }
+        Cosh => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.cosh()),
+                _ => panic!("cosh expects scalar values"),
+            }
+        }
+        Acosh => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.acosh()),
+                _ => panic!("acosh expects scalar values"),
             }
         }
         Tan => {
@@ -173,12 +215,33 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 _ => panic!("tan expects scalar values"),
             }
         }
+        Atan => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.atan()),
+                _ => panic!("atan expects scalar values"),
+            }
+        }
         Atan2 => {
             let arg0 = eval_expr(env, Box::new(args[0].clone()));
             let arg1 = eval_expr(env, Box::new(args[1].clone()));
             match (arg0, arg1) {
                 (ScalarVal(arg0), ScalarVal(arg1)) => ScalarVal(arg0.atan2(arg1)),
                 _ => panic!("atan2 expects scalar values"),
+            }
+        }
+        Tanh => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.tanh()),
+                _ => panic!("tanh expects scalar values"),
+            }
+        }
+        Atanh => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.atanh()),
+                _ => panic!("atanh expects scalar values"),
             }
         }
         Exp => {
@@ -245,6 +308,13 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 _ => panic!("floor expects scalar values"),
             }
         }
+        Trunc => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.trunc()),
+                _ => panic!("trunc expects scalar values"),
+            }
+        }
         Ceil => {
             let x = eval_expr(env, Box::new(args[0].clone()));
             match x {
@@ -259,11 +329,18 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 _ => panic!("fract expects scalar values"),
             }
         }
+        Round => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => ScalarVal(x.round()),
+                _ => panic!("round expects scalar values"),
+            }
+        }
         Mod => {
             let x = eval_expr(env, Box::new(args[0].clone()));
             let m = eval_expr(env, Box::new(args[1].clone()));
             match (x, m) {
-                (ScalarVal(x), ScalarVal(m)) => ScalarVal(modulo(x, m) - 1.0 * m),
+                (ScalarVal(x), ScalarVal(m)) => ScalarVal(modulo(x, m) - m),
                 _ => panic!("mod expects scalar values"),
             }
         }
@@ -629,17 +706,67 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 _ => panic!("smoothabs expects scalar values"),
             }
         }
+        PolySmoothAbs => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let m = if args.len() > 1 {
+                eval_expr(env, Box::new(args[1].clone()))
+            } else {
+                ScalarVal(0.5)
+            };
+            match (x, m) {
+                (ScalarVal(x), ScalarVal(p)) => ScalarVal(poly_smooth_abs(x, p)),
+                _ => panic!("smoothabs expects scalar values"),
+            }
+        }
         SmoothClamp => {
-            let arg0 = eval_expr(env, Box::new(args[0].clone()));
-            let arg1 = eval_expr(env, Box::new(args[1].clone()));
-            let arg2 = eval_expr(env, Box::new(args[2].clone()));
-            let arg3 = eval_expr(env, Box::new(args[3].clone()));
-            match (arg0, arg1, arg2, arg3) {
-                (ScalarVal(arg0), ScalarVal(arg1), ScalarVal(arg2), ScalarVal(arg3)) => ScalarVal(
-                    (smooth_abs(arg0 - arg2, arg1) - smooth_abs(arg0 - arg3, arg2) + arg2 + arg3)
-                        / 2.0,
-                ),
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let p = eval_expr(env, Box::new(args[1].clone()));
+            let a = eval_expr(env, Box::new(args[2].clone()));
+            let b = eval_expr(env, Box::new(args[3].clone()));
+            match (x, p, a, b) {
+                (ScalarVal(x), ScalarVal(p), ScalarVal(a), ScalarVal(b)) => {
+                    ScalarVal((smooth_abs(x - a, p) - smooth_abs(x - b, p) + a + b) / 2.0)
+                }
                 _ => panic!("smoothclamp expects scalar values"),
+            }
+        }
+        // qcl=(x,p,a,b)=>(qB(x-a,p)-qB(x-b,p)+b+a)/2
+        PolySmoothClamp => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let p = eval_expr(env, Box::new(args[1].clone()));
+            let a = eval_expr(env, Box::new(args[2].clone()));
+            let b = eval_expr(env, Box::new(args[3].clone()));
+            match (x, p, a, b) {
+                (ScalarVal(x), ScalarVal(p), ScalarVal(a), ScalarVal(b)) => {
+                    ScalarVal((poly_smooth_abs(x - a, p) - poly_smooth_abs(x - b, p) + a + b) / 2.0)
+                }
+                _ => panic!("smoothclamp expects scalar values"),
+            }
+        }
+        RoundMax => {
+            let a = eval_expr(env, Box::new(args[0].clone()));
+            let b = eval_expr(env, Box::new(args[1].clone()));
+            let r = eval_expr(env, Box::new(args[2].clone()));
+            match (a, b, r) {
+                (ScalarVal(a), ScalarVal(b), ScalarVal(r)) => ScalarVal(if -a < r && -b < r {
+                    Vec2::new(r + a, r + b).length() - r
+                } else {
+                    a.max(b)
+                }),
+                _ => panic!("roundmax expects scalar values"),
+            }
+        }
+        RoundMin => {
+            let a = eval_expr(env, Box::new(args[0].clone()));
+            let b = eval_expr(env, Box::new(args[1].clone()));
+            let r = eval_expr(env, Box::new(args[2].clone()));
+            match (a, b, r) {
+                (ScalarVal(a), ScalarVal(b), ScalarVal(r)) => ScalarVal(if a < r && b < r {
+                    r - Vec2::new(r - a, r - b).length()
+                } else {
+                    a.max(b)
+                }),
+                _ => panic!("roundmax expects scalar values"),
             }
         }
     }
@@ -647,4 +774,12 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
 
 fn smooth_abs(x: f32, p: f32) -> f32 {
     (x * x + p).sqrt()
+}
+
+fn poly_smooth_abs(x: f32, m: f32) -> f32 {
+    if x.abs() > m {
+        x
+    } else {
+        (2.0 - x / m) * x * x / m
+    }
 }

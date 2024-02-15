@@ -1,4 +1,5 @@
 pub fn expand(input: &str) -> String {
+    let input = input.replace("Math.", "");
     let mut in_chars = input.chars();
     let mut output = String::new();
     let mut current_char = in_chars.next();
@@ -64,6 +65,8 @@ mod tests {
         let input = "@xyz{$=B($)-6,} L(x,y,z)-5";
         dbg!(expand(input));
         let input = "s=2.5,h=s/2,d=(s+h)/2,q=20,y-=10,[x,y]=r0(x,y),@xyz{$/=q,}c=1,t=0,@7{@xyz{$=mod($-h,s)-h,}t=d/D([x,y,z],[x,y,z]),@xyzc{$*=t,}}d=L(x,y,z)/c*2.-.025";
+        dbg!(expand(input));
+        let input = "P=Math.pow,c=.5,GA=(v,k)=>(b=c*P(2*((v<c)?v:1-v),k),(v<c)?b:1-b); pl=U(y+GA( B(TR(x)),.1) + Math.acos(z),1), ba=L(x,y,z-2.5), rU(ba,pl,3)";
         dbg!(expand(input));
     }
 }

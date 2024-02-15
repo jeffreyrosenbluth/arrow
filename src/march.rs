@@ -30,10 +30,11 @@ fn normal(p: Vec3, sdf: &Sdf) -> Vec3 {
 }
 
 fn camera(pos: Vec3, look_at: Vec3) -> Mat3 {
-    let forward = (look_at - pos).normalize();
-    let right = v3(0.0, 1.0, 0.0).cross(forward).normalize();
-    let up = forward.cross(right).normalize();
-    Mat3::from_cols(right, up, forward)
+    let up = v3(0.0, 1.0, 0.0);
+    let w = (look_at - pos).normalize();
+    let u = up.cross(w).normalize();
+    let v = w.cross(u).normalize();
+    Mat3::from_cols(u, v, w)
 }
 
 fn softshadow(sdf: &Sdf, ro: Vec3, rd: Vec3, mint: f32, maxt: f32, k: f32) -> f32 {
@@ -50,7 +51,7 @@ fn softshadow(sdf: &Sdf, ro: Vec3, rd: Vec3, mint: f32, maxt: f32, k: f32) -> f3
             return res;
         }
     }
-    return res.clamp(0.0, 1.0);
+    res.clamp(0.0, 1.0)
 }
 
 fn ambient_occlusion(sdf: &Sdf, p: Vec3, n: Vec3) -> f32 {

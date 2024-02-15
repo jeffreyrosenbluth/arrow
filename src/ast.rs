@@ -31,8 +31,17 @@ pub enum BinOp {
 pub enum FunctionName {
     Sin,
     Cos,
+    Acos,
+    Asin,
     Tan,
+    Atan,
     Atan2,
+    Sinh,
+    Cosh,
+    Tanh,
+    Asinh,
+    Acosh,
+    Atanh,
     Exp,
     Exp2,
     Log,
@@ -42,6 +51,7 @@ pub enum FunctionName {
     Abs,
     Sign,
     Floor,
+    Trunc,
     Ceil,
     Fract,
     Mod,
@@ -68,7 +78,12 @@ pub enum FunctionName {
     Triangle,
     Corner,
     SmoothAbs,
+    PolySmoothAbs,
     SmoothClamp,
+    PolySmoothClamp,
+    RoundMax,
+    RoundMin,
+    Round,
 }
 
 #[derive(Debug, Clone, Serialize)]

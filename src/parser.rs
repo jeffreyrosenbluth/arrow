@@ -56,6 +56,10 @@ fn statement(i: &mut &str) -> PResult<Statement> {
     .parse_next(i)
 }
 
+fn expr(i: &mut &str) -> PResult<Expr> {
+    delimited(multispaces, alt((sum, product, function)), multispaces).parse_next(i)
+}
+
 fn assign_scalar(i: &mut &str) -> PResult<Statement> {
     let var = identifier.parse_next(i)?;
     delimited(multispaces, "=", multispaces).parse_next(i)?;
@@ -149,10 +153,6 @@ fn return_statement(i: &mut &str) -> PResult<Statement> {
     expr.map(|e| Statement::Return(Box::new(e))).parse_next(i)
 }
 
-fn expr(i: &mut &str) -> PResult<Expr> {
-    delimited(multispaces, alt((sum, product, function)), multispaces).parse_next(i)
-}
-
 fn sum(i: &mut &str) -> PResult<Expr> {
     use BinOp::*;
     let init = product.parse_next(i)?;
@@ -221,9 +221,8 @@ fn variable(i: &mut &str) -> PResult<Expr> {
     identifier.map(|v| Expr::Variable(v)).parse_next(i)
 }
 
-// Math LN10 LN2 LOG10E LOG2E SQRT1_2 SQRT2 abs acos acosh asin asinh atan atan2 atanh cbrt ceil
-// clz32 cos cosh exp expm1 floor fround hypot imul log log10 log1p log2 max min pow round sign
-// sin sinh sqrt tan tanh trunc mix mod fract rmax rmin bx2 bx3 don sabs scl qcl rot Infinity map reduce
+// round
+//   qcl rot Infinity map reduce
 
 fn function_name(i: &mut &str) -> PResult<FunctionName> {
     use FunctionName::*;
@@ -274,7 +273,29 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "sB".map(|_| SmoothAbs),
             "scl".map(|_| SmoothClamp),
         )),
-        alt(("r0".map(|_| Rot0), "r1".map(|_| Rot1))),
+        alt((
+            "r0".map(|_| Rot0),
+            "r1".map(|_| Rot1),
+            "rG".map(|_| RoundMax),
+            "rmax".map(|_| RoundMax),
+            "rU".map(|_| RoundMin),
+            "rmin".map(|_| RoundMin),
+            "acos".map(|_| Acos),
+            "asin".map(|_| Asin),
+            "atan".map(|_| Atan),
+            "sinh".map(|_| Sinh),
+            "cosh".map(|_| Cosh),
+            "tanh".map(|_| Tanh),
+            "trunc".map(|_| Trunc),
+            "acosh".map(|_| Acosh),
+            "asinh".map(|_| Asinh),
+            "atanh".map(|_| Atanh),
+            "qB".map(|_| PolySmoothAbs),
+            "sabs".map(|_| SmoothAbs),
+            "round".map(|_| Round),
+            "qcl".map(|_| PolySmoothClamp),
+            // 21
+        )),
     ))
     .parse_next(i)
 }
@@ -300,6 +321,7 @@ fn args(i: &mut &str) -> PResult<Vec<Expr>> {
 
 fn function(i: &mut &str) -> PResult<Expr> {
     let name = function_name.parse_next(i)?;
+    dbg!(&name);
     delimited(multispaces, "(", multispaces).parse_next(i)?;
     let args = args.parse_next(i)?;
     delimited(multispaces, ")", multispaces).parse_next(i)?;
