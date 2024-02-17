@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::core::{modulo, v3, I, ZERO3};
+use crate::core::{fbm, modulo, v3, I, ZERO3};
 use crate::sdf::{sd_box, sd_torus};
 use glam::{Mat2, Vec2, Vec3};
 use std::collections::HashMap;
@@ -566,7 +566,6 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 _ => panic!("addmul expects scalar values"),
             }
         }
-        ValueNoise => todo!(),
         Torus => {
             let arg0 = eval_expr(env, Box::new(args[0].clone()));
             let arg1 = eval_expr(env, Box::new(args[1].clone()));
@@ -764,9 +763,32 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 (ScalarVal(a), ScalarVal(b), ScalarVal(r)) => ScalarVal(if a < r && b < r {
                     r - Vec2::new(r - a, r - b).length()
                 } else {
-                    a.max(b)
+                    a.min(b)
                 }),
                 _ => panic!("roundmax expects scalar values"),
+            }
+        }
+        ValueNoise => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let y = eval_expr(env, Box::new(args[1].clone()));
+            let z = eval_expr(env, Box::new(args[2].clone()));
+            let scale = eval_expr(env, Box::new(args[3].clone()));
+            let offset = eval_expr(env, Box::new(args[4].clone()));
+            let octaves = if args.len() > 5 {
+                eval_expr(env, Box::new(args[5].clone()))
+            } else {
+                ScalarVal(1.0)
+            };
+            match (x, y, z, scale, offset, octaves) {
+                (
+                    ScalarVal(x),
+                    ScalarVal(y),
+                    ScalarVal(z),
+                    ScalarVal(scale),
+                    ScalarVal(offset),
+                    ScalarVal(octaves),
+                ) => ScalarVal(fbm(x, y, z, scale, offset, octaves as u32)),
+                _ => panic!("noise expects scalar values"),
             }
         }
     }

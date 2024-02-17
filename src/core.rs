@@ -1,5 +1,6 @@
 use ::noise::{Fbm, NoiseFn, Perlin};
 use glam::{Affine3A, Vec3};
+use serde::de;
 
 pub const I: Affine3A = Affine3A::IDENTITY;
 pub const LUM: f32 = 0.3;
@@ -169,6 +170,77 @@ impl Noise {
             amplitude *= 0.5;
             frequency *= 2.0;
         }
-        value as f32
+        0.5 * value as f32
+    }
+}
+
+fn hash(p: Vec3) -> f32 // replace this by something better
+{
+    let mut p = (p * 0.3183099 + 0.1).fract();
+    p *= 17.0;
+    (p.x * p.y * p.z * (p.x + p.y + p.z)).fract()
+}
+
+// Return a value between -1 and 1.
+pub fn noise(x: Vec3) -> f32 {
+    let i: Vec3 = x.floor();
+    let f: Vec3 = x.fract();
+    let f = f * f * (3.0 - 2.0 * f);
+
+    mix(
+        mix(
+            mix(
+                hash(i + v3(0.0, 0.0, 0.0)),
+                hash(i + v3(1.0, 0.0, 0.0)),
+                f.x,
+            ),
+            mix(
+                hash(i + v3(0.0, 1.0, 0.0)),
+                hash(i + v3(1.0, 1.0, 0.0)),
+                f.x,
+            ),
+            f.y,
+        ),
+        mix(
+            mix(
+                hash(i + v3(0.0, 0.0, 1.0)),
+                hash(i + v3(1.0, 0.0, 1.0)),
+                f.x,
+            ),
+            mix(
+                hash(i + v3(0.0, 1.0, 1.0)),
+                hash(i + v3(1.0, 1.0, 1.0)),
+                f.x,
+            ),
+            f.y,
+        ),
+        f.z,
+    ) * 2.0
+        - 1.0
+}
+
+// The range of the noise depends on the number of octaves.
+pub fn fbm(x: f32, y: f32, z: f32, scale: f32, offset: f32, octaves: u32) -> f32 {
+    let mut p = v3(x, y, z) * scale + v3(offset, offset, offset);
+    let mut a = 0.0;
+    let mut sum = 0.0;
+    for o in 1..=octaves {
+        a += 1.0 / (2.0 * o as f32);
+        p *= 2.03;
+        sum += a * noise(p);
+    }
+    sum
+}
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_noise() {
+        for i in 0..100 {
+            let w = i as f32;
+            let n = fbm(w / 2.375, w / 11.8, w / 20.73, 0.03, 0.0, 4);
+            println!("Noise: {}", n);
+        }
     }
 }
