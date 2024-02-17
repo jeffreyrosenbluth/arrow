@@ -74,6 +74,13 @@ pub fn eval(env: &mut Environment, ast: &Statement, v: Vec3) {
 fn eval_expr(env: &mut Environment, ast: Box<Expr>) -> Value {
     use Value::*;
     match *ast {
+        Expr::Negate(expr) => {
+            let r = eval_expr(env, expr);
+            match r {
+                ScalarVal(r) => ScalarVal(-r),
+                _ => panic!("negate expects scalar values"),
+            }
+        }
         Expr::Scalar(value) => {
             let r = ScalarVal(value);
             env.insert("#".to_string(), r);

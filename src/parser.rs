@@ -190,12 +190,21 @@ fn product(i: &mut &str) -> PResult<Expr> {
 }
 
 fn scalar(i: &mut &str) -> PResult<Expr> {
-    delimited(
+    let negation = opt('-').map(|op| op.is_some());
+    let expr = delimited(
         multispaces,
         alt((float.map(Expr::Scalar), function, parens, variable)),
         multispaces,
-    )
-    .parse_next(i)
+    );
+    (negation, expr)
+        .map(|(negated, expr)| {
+            if negated {
+                Expr::Negate(Box::new(expr))
+            } else {
+                expr
+            }
+        })
+        .parse_next(i)
 }
 
 fn identifier(i: &mut &str) -> PResult<String> {
@@ -218,7 +227,6 @@ fn identifier(i: &mut &str) -> PResult<String> {
 }
 
 fn variable(i: &mut &str) -> PResult<Expr> {
-    dbg!(&i);
     identifier.map(|v| Expr::Variable(v)).parse_next(i)
 }
 
@@ -340,9 +348,7 @@ mod tests {
     #[test]
     fn tt() {
         // let input = "s=1;@5{@xyz{$=B($*2)-8,}s*=.5,}(L(x,y,z)-8)*s";
-        // let input = "s=2.5,h=s/2,d=(s+h)/2,q=20,y-=10,[x,y]=r0(x,y),@xyz{$/=q,}c=1,t=0,@7{@xyz{$=mod($-h,s)-h,}t=d/D([x,y,z],[x,y,z]),@xyzc{$*=t,}}d=L(x,y,z)/c*2.-.025";
-        // let input = "D([x,y,z],[x,y,z])";
-        let input = "p=-f";
+        let input = "s=2.5,h=s/2,d=(s+h)/2,q=20,y-=10,[x,y]=r0(x,y),@xyz{$/=q,}c=1,t=0,@7{@xyz{$=mod($-h,s)-h,}t=d/D([x,y,z],[x,y,z]),@xyzc{$*=t,}}d=L(x,y,z)/c*2.-.025";
         dbg!(program.parse_peek(input));
     }
     #[test]

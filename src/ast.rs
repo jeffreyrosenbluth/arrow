@@ -13,6 +13,7 @@ pub enum Statement {
 pub enum Expr {
     Scalar(f32),
     BinaryOp(BinOp),
+    Negate(Box<Expr>),
     Paren(Box<Expr>),
     Function { name: FunctionName, args: Vec<Expr> },
     Variable(String),
