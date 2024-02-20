@@ -17,6 +17,7 @@ pub enum Expr {
     Paren(Box<Expr>),
     Function { name: FunctionName, args: Vec<Expr> },
     Variable(String),
+    TernaryOp(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -26,6 +27,10 @@ pub enum BinOp {
     Mul(Box<Expr>, Box<Expr>),
     Div(Box<Expr>, Box<Expr>),
     Eq(Box<Expr>, Box<Expr>),
+    Greater(Box<Expr>, Box<Expr>),
+    GreaterEq(Box<Expr>, Box<Expr>),
+    Less(Box<Expr>, Box<Expr>),
+    LessEq(Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug, Clone, Serialize)]

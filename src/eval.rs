@@ -25,6 +25,28 @@ pub enum Value {
     Vec3Val(Vec3),
 }
 
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::ScalarVal(a), Value::ScalarVal(b)) => a == b,
+            (Value::BoolVal(a), Value::BoolVal(b)) => a == b,
+            (Value::Vec2Val(a), Value::Vec2Val(b)) => a == b,
+            (Value::Vec3Val(a), Value::Vec3Val(b)) => a == b,
+            _ => panic!("eq expects scalar values"),
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Value::ScalarVal(a), Value::ScalarVal(b)) => a.partial_cmp(b),
+            (Value::BoolVal(a), Value::BoolVal(b)) => a.partial_cmp(b),
+            _ => panic!("partial_cmp expects scalar values"),
+        }
+    }
+}
+
 pub type Environment = HashMap<String, Value>;
 
 pub fn eval(env: &mut Environment, ast: &Statement, v: Vec3) {
@@ -106,12 +128,62 @@ fn eval_expr(env: &mut Environment, ast: Box<Expr>) -> Value {
             env.insert("#".to_string(), value);
             value
         }
+        Expr::TernaryOp(cond, if_true, if_false) => {
+            let cond = eval_expr(env, cond);
+            let value = match cond {
+                BoolVal(true) => eval_expr(env, if_true),
+                BoolVal(false) => eval_expr(env, if_false),
+                _ => panic!("ternary expects boolean values"),
+            };
+            env.insert("#".to_string(), value);
+            value
+        }
     }
 }
 
 fn eval_binop(env: &mut Environment, ast: BinOp) -> Value {
     use Value::*;
     match ast {
+        BinOp::Eq(a, b) => {
+            let a = eval_expr(env, a);
+            let b = eval_expr(env, b);
+            match (a, b) {
+                (ScalarVal(a), ScalarVal(b)) => BoolVal(a == b),
+                _ => panic!("== expects scalar values"),
+            }
+        }
+        BinOp::Greater(a, b) => {
+            let a = eval_expr(env, a);
+            let b = eval_expr(env, b);
+            match (a, b) {
+                (ScalarVal(a), ScalarVal(b)) => BoolVal(a > b),
+                _ => panic!("> expects scalar values"),
+            }
+        }
+        BinOp::GreaterEq(a, b) => {
+            let a = eval_expr(env, a);
+            let b = eval_expr(env, b);
+            match (a, b) {
+                (ScalarVal(a), ScalarVal(b)) => BoolVal(a >= b),
+                _ => panic!(">= expects scalar values"),
+            }
+        }
+        BinOp::Less(a, b) => {
+            let a = eval_expr(env, a);
+            let b = eval_expr(env, b);
+            match (a, b) {
+                (ScalarVal(a), ScalarVal(b)) => BoolVal(a < b),
+                _ => panic!("< expects scalar values"),
+            }
+        }
+        BinOp::LessEq(a, b) => {
+            let a = eval_expr(env, a);
+            let b = eval_expr(env, b);
+            match (a, b) {
+                (ScalarVal(a), ScalarVal(b)) => BoolVal(a <= b),
+                _ => panic!("<= expects scalar values"),
+            }
+        }
         BinOp::Add(a, b) => {
             let a = eval_expr(env, a);
             let b = eval_expr(env, b);
@@ -142,14 +214,6 @@ fn eval_binop(env: &mut Environment, ast: BinOp) -> Value {
             match (a, b) {
                 (ScalarVal(a), ScalarVal(b)) => ScalarVal(a / b),
                 _ => panic!("/ expects scalar values"),
-            }
-        }
-        BinOp::Eq(a, b) => {
-            let a = eval_expr(env, a);
-            let b = eval_expr(env, b);
-            match (a, b) {
-                (ScalarVal(a), ScalarVal(b)) => BoolVal(a == b),
-                _ => panic!("== expects scalar values"),
             }
         }
     }
@@ -762,18 +826,32 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 _ => panic!("roundmax expects scalar values"),
             }
         }
+        // RoundMin => {
+        //     let a = eval_expr(env, Box::new(args[0].clone()));
+        //     let b = eval_expr(env, Box::new(args[1].clone()));
+        //     let r = eval_expr(env, Box::new(args[2].clone()));
+        //     match (a, b, r) {
+        //         (ScalarVal(a), ScalarVal(b), ScalarVal(r)) => ScalarVal(smooth_min(a, b, r)),
+        //         _ => panic!("roundmax expects scalar values"),
+        //     }
+        // }
         RoundMin => {
-            let a = eval_expr(env, Box::new(args[0].clone()));
-            let b = eval_expr(env, Box::new(args[1].clone()));
-            let r = eval_expr(env, Box::new(args[2].clone()));
-            match (a, b, r) {
-                (ScalarVal(a), ScalarVal(b), ScalarVal(r)) => ScalarVal(if a < r && b < r {
-                    r - Vec2::new(r - a, r - b).length()
-                } else {
-                    a.min(b)
-                }),
-                _ => panic!("roundmax expects scalar values"),
-            }
+            let mut ds: Vec<f32> = args
+                .into_iter()
+                .map(|arg| {
+                    if let ScalarVal(v) = eval_expr(env, Box::new(arg)) {
+                        v
+                    } else {
+                        f32::MAX
+                    }
+                })
+                .collect();
+            let r = ds.pop().unwrap();
+            let m = ds
+                .into_iter()
+                .reduce(|acc, e| smooth_min(acc, e, r))
+                .unwrap();
+            ScalarVal(m)
         }
         ValueNoise => {
             let x = eval_expr(env, Box::new(args[0].clone()));
@@ -803,6 +881,14 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
 
 fn smooth_abs(x: f32, p: f32) -> f32 {
     (x * x + p).sqrt()
+}
+
+fn smooth_min(a: f32, b: f32, r: f32) -> f32 {
+    if a < r && b < r {
+        r - Vec2::new(r - a, r - b).length()
+    } else {
+        a.min(b)
+    }
 }
 
 fn poly_smooth_abs(x: f32, m: f32) -> f32 {

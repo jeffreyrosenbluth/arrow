@@ -27,6 +27,26 @@ fn comma<'a>(i: &mut &'a str) -> PResult<&'a str> {
     delimited(multispaces, ",", multispaces).parse_next(i)
 }
 
+fn gt<'a>(i: &mut &'a str) -> PResult<&'a str> {
+    delimited(multispaces, ">", multispaces).parse_next(i)
+}
+
+fn ge<'a>(i: &mut &'a str) -> PResult<&'a str> {
+    delimited(multispaces, ">=", multispaces).parse_next(i)
+}
+
+fn lt<'a>(i: &mut &'a str) -> PResult<&'a str> {
+    delimited(multispaces, "<", multispaces).parse_next(i)
+}
+
+fn le<'a>(i: &mut &'a str) -> PResult<&'a str> {
+    delimited(multispaces, "<=", multispaces).parse_next(i)
+}
+
+fn equal<'a>(i: &mut &'a str) -> PResult<&'a str> {
+    delimited(multispaces, "==", multispaces).parse_next(i)
+}
+
 pub fn program(i: &mut &str) -> PResult<Statement> {
     let mut i_str: &str = &expand(i);
     let j = &mut i_str;
@@ -56,8 +76,27 @@ fn statement(i: &mut &str) -> PResult<Statement> {
     .parse_next(i)
 }
 
+fn ternary(i: &mut &str) -> PResult<Expr> {
+    let condition = comp.parse_next(i)?;
+    dbg!(&condition);
+    delimited(multispaces, "?", multispaces).parse_next(i)?;
+    let if_true = expr.parse_next(i)?;
+    delimited(multispaces, ":", multispaces).parse_next(i)?;
+    let if_false = expr.parse_next(i)?;
+    Ok(Expr::TernaryOp(
+        Box::new(condition),
+        Box::new(if_true),
+        Box::new(if_false),
+    ))
+}
+
 fn expr(i: &mut &str) -> PResult<Expr> {
-    delimited(multispaces, alt((sum, product, function)), multispaces).parse_next(i)
+    delimited(
+        multispaces,
+        alt((ternary, comp, sum, product, function)),
+        multispaces,
+    )
+    .parse_next(i)
 }
 
 fn assign_scalar(i: &mut &str) -> PResult<Statement> {
@@ -153,6 +192,20 @@ fn return_statement(i: &mut &str) -> PResult<Statement> {
     expr.map(|e| Statement::Return(Box::new(e))).parse_next(i)
 }
 
+fn comp(i: &mut &str) -> PResult<Expr> {
+    use BinOp::*;
+    let lhs = sum.parse_next(i)?;
+    let op = alt((gt, ge, lt, le, equal)).parse_next(i)?;
+    let rhs = sum.parse_next(i)?;
+    match op {
+        "==" => Ok(Expr::BinaryOp(Eq(Box::new(lhs), Box::new(rhs)))),
+        ">=" => Ok(Expr::BinaryOp(GreaterEq(Box::new(lhs), Box::new(rhs)))),
+        "<=" => Ok(Expr::BinaryOp(LessEq(Box::new(lhs), Box::new(rhs)))),
+        ">" => Ok(Expr::BinaryOp(Greater(Box::new(lhs), Box::new(rhs)))),
+        _ => Ok(Expr::BinaryOp(Less(Box::new(lhs), Box::new(rhs)))),
+    }
+}
+
 fn sum(i: &mut &str) -> PResult<Expr> {
     use BinOp::*;
     let init = product.parse_next(i)?;
@@ -193,7 +246,7 @@ fn scalar(i: &mut &str) -> PResult<Expr> {
     let negation = opt('-').map(|op| op.is_some());
     let expr = delimited(
         multispaces,
-        alt((float.map(Expr::Scalar), function, parens, variable)),
+        alt((float.map(Expr::Scalar), function, parens, variable, ternary)),
         multispaces,
     );
     (negation, expr)
@@ -230,8 +283,7 @@ fn variable(i: &mut &str) -> PResult<Expr> {
     identifier.map(|v| Expr::Variable(v)).parse_next(i)
 }
 
-// round
-//   qcl rot Infinity map reduce
+// rot Infinity map reduce
 
 fn function_name(i: &mut &str) -> PResult<FunctionName> {
     use FunctionName::*;
@@ -348,7 +400,12 @@ mod tests {
     #[test]
     fn tt() {
         // let input = "s=1;@5{@xyz{$=B($*2)-8,}s*=.5,}(L(x,y,z)-8)*s";
-        let input = "s=2.5,h=s/2,d=(s+h)/2,q=20,y-=10,[x,y]=r0(x,y),@xyz{$/=q,}c=1,t=0,@7{@xyz{$=mod($-h,s)-h,}t=d/D([x,y,z],[x,y,z]),@xyzc{$*=t,}}d=L(x,y,z)/c*2.-.025";
+        // let input = "s=2.5,h=s/2,d=(s+h)/2,q=20,y-=10,[x,y]=r0(x,y),@xyz{$/=q,}c=1,t=0,@7{@xyz{$=mod($-h,s)-h,}t=d/D([x,y,z],[x,y,z]),@xyzc{$*=t,}}d=L(x,y,z)/c*2.-.025";
+        // let input =  "[x,z]=r0(x,z), x+=11, z+=15, y+=10, h=exp(-1.5*B(nz(x,0,z,.1,1))), g=y-10*h-nz(x,0,z,10,1)*0.05, b = y-12, a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8,),1.5 )-nz(x,0,z,12,1)*0.15, s=(L(x>7?(mod(x,4)-2)/2:x,x<1?y:b/3+2,B(z)-1.5)-1.8)-nz(x,y,z,.5,1)*2, rG(U(a,g),-s,1)";
+        // let input = "a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8,),1.5 )-nz(x,0,z,12,1)*0.15"; //, rG(U(a,g),-s,1)";
+        // let input = "x>7?(mod(x,4)-2)/2:x";
+        let input = "b=0; a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8),1.5 )";
+        // let input = "a=rU(1,2,3,4,5,6)";
         dbg!(program.parse_peek(input));
     }
     #[test]
