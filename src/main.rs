@@ -2,7 +2,7 @@ use arrow::core::*;
 use arrow::eval::*;
 use arrow::march::render;
 
-const S: u32 = 4;
+const S: u32 = 1;
 const WIDTH: u32 = 1024 / S;
 const HEIGHT: u32 = 768 / S;
 
@@ -14,7 +14,7 @@ fn main() {
     // let mut donut = "don(x,y-2,z,5,1)";
     // let mut rods = "L(B(B(x)-3)-3,B(y)-3)-2";
     // let mut rounded_box = "bx3(x,y-5,z-5,7,4,4)-5";
-    // let mut elbow = "L(k(x,y-10),z)-5";
+    let mut elbow = "L(k(x,y-10),z)-5";
     // let mut fence = "L(x,TR(y))-.5";
     // let mut cross =
     //     "U( bx3(mod(x,4)-2,y,z,6), bx3(x,y,mod(x,4)-2,6), L(TR(x),y)-1, L(x+20,y-20,z-20)-8)";
@@ -35,8 +35,8 @@ fn main() {
     // let mut ondu = "s=.5,y+=6, a=k(y+22,B(z+10*g(x*.005+.2))-16)-4,b=TR(x/40+.2)*40,c; [b,y]=r1(b,y), [y,z]=r0(y,z+15), r=rU(U(@byz{bx2(B($$$)-20,bx2($,$$,23)+3,3)-.4,}),a,3), @4{ [x,y]=r1(x,y), [y,z]=r0(y,z), a=nz(x,y,z,.02/s,$+5), a=B(a)*50-3, r=rU(r,rG(r-7*s,a*s,s*2),s*2), s*=.5, } r";
     // let mut source = "@zy{$f=$+nz(x,y,z,.03,1)*40,} zf+=nz(x,y,z,.1,2)*20, f=L(zf+10,yf)-20, w=y+nz(x,y,z+30,.4,2,1)*2.2+1, g=y+nz(x,y,z,0.1,1), p=min(max(g,-f),max(w,f))+nz(x,y,z,.02,2,2)*4, [ex,ey]=r0(x-18,y-6), [ey,ez]=r1(ey,z-11), es=2, e=bx3(ex,ey,ez,es*1.5,es,.1), sg=.5, @xyz{$g=e$+nz(ex/1.6,ey,ez,1,1,2)*2,} g=1e6, @xy{g=U(g,L(ez-.1,mod($g, sg)-sg/2)-sg*.07),} g=max(g,bx3(ex,ey,ez,es*1.5*.85,es*.85,2)), min(p, e, g, bx3(ex+3,B(ey)-.8,ez, 4,.1,.1), bx3(ex+3,ey,ez, .05, es*1.2,.5),bx3(ex-3,ey,ez, .05, es*.2,.2))";
     // let mut spheres = "y-=5,z-=3, r=L(x,y,z), ph=atan2(y,x), th=Math.acos(z/r), n=18,r0=r-33, cs=sin(n*ph)*cos(n*th), c0=L(r0,cs)-.1, c3=L(r0-cl(r0,-2,-1),r/n*(cs-.5))-.05, c4=L(r0-cl(r0,-1,.5),r/n*(cs-.75))-.05, c5=L(r0-cl(r0,-1,1),r/n*(cs-.95))-.025, n=4,r1=1.25*n*sin(th), x=r0, y=r/n*sin(th)*cos(n*ph)*sin(n*th), z=r/n*sin(th)*sin(n*ph)*cos(n*th), c1=L(x,y,z)-r1, r=L(x,y,z), ph=atan2(y,x), th=Math.acos(z/r), zr=r-r1-cl(r-r1,0,.5), n=12, x=r/n*(sin(th)*cos(n*ph)*sin(n*th)-.5), c2=L(x,zr)-.05, U(c0,c1,c2,c3,c4,c5)";
-    let mut arctic = "[x,z]=r0(x,z), x+=11, z+=15, y+=10, h=exp(-1.5*B(nz(x,0,z,.1,1))), g=y-10*h-nz(x,0,z,10,1)*0.05, b = y-12, a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8),1.5 )-nz(x,0,z,12,1)*0.15, s=(L(x>7?(mod(x,4)-2)/2:x,x<1?y:b/3+2,B(z)-1.5)-1.8)-nz(x,y,z,.5,1)*2, rG(U(a,g),-s,1)";
-    let ast = program(&mut arctic).unwrap();
+    // let mut arctic = "[x,z]=r0(x,z), x+=11, z+=15, y+=10, h=exp(-1.5*B(nz(x,0,z,.1,1))), g=y-10*h-nz(x,0,z,10,1)*0.05, b = y-12, a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8),1.5 )-nz(x,0,z,12,1)*0.15, s=(L(x>7?(mod(x,4)-2)/2:x,x<1?y:b/3+2,B(z)-1.5)-1.8)-nz(x,y,z,.5,1)*2, rG(U(a,g),-s,1)";
+    let ast = parse(&mut elbow);
     dbg!(&ast);
     let sdf: Sdf = Box::new(move |p| make_sdf(&ast, 0.1, 0.2, p));
     println!("sdf: {}", sdf(v3(0.0, 0.0, -100.0)));

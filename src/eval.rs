@@ -251,6 +251,15 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 _ => panic!("asinh expects scalar values"),
             }
         }
+        FakeSine => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            match x {
+                ScalarVal(x) => {
+                    ScalarVal(((x - x.floor() - 0.5) * 2.0).abs() * x * (6.0 - 4.0 * x) - 1.0)
+                }
+                _ => panic!("fakesine expects scalar values"),
+            }
+        }
         Cos => {
             let x = eval_expr(env, Box::new(args[0].clone()));
             match x {

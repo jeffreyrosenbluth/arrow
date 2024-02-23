@@ -90,6 +90,7 @@ pub enum FunctionName {
     RoundMax,
     RoundMin,
     Round,
+    FakeSine,
 }
 
 #[derive(Debug, Clone, Serialize)]

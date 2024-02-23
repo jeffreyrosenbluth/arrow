@@ -39,13 +39,21 @@ fn process_macro(macro_type: &String, content: &String) -> String {
     let mut result = String::new();
     if let Ok(repeats) = macro_type.parse::<usize>() {
         // Number-based macro
-        for i in 1..=repeats {
-            result += &content.replace("$", &i.to_string());
+        let is: Vec<usize> = (1..=repeats).collect();
+        for i in is.windows(3) {
+            result += &content
+                .replace("$$$", &(i[2] % (repeats + 1)).to_string())
+                .replace("$$", &(i[1] % (repeats + 1)).to_string())
+                .replace("$", &i[0].to_string());
         }
     } else {
         // Character-based macro
-        for ch in macro_type.chars() {
-            result += &content.replace("$", &ch.to_string());
+        let cs: Vec<char> = macro_type.chars().collect();
+        for i in 0..cs.len() {
+            result += &content
+                .replace("$$$", &cs[(i + 2) % cs.len()].to_string())
+                .replace("$$", &cs[(i + 1) % cs.len()].to_string())
+                .replace("$", &cs[i].to_string());
         }
     }
     result

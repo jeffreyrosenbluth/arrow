@@ -11,6 +11,11 @@ use winnow::{
     token::one_of,
 };
 
+pub fn parse(input: &mut &str) -> Statement {
+    let mut i_str: &str = &expand(input);
+    program(&mut i_str).unwrap()
+}
+
 fn lbracket<'a>(i: &mut &'a str) -> PResult<&'a str> {
     delimited(multispaces, "[", multispaces).parse_next(i)
 }
@@ -47,13 +52,10 @@ fn equal<'a>(i: &mut &'a str) -> PResult<&'a str> {
     delimited(multispaces, "==", multispaces).parse_next(i)
 }
 
-pub fn program(i: &mut &str) -> PResult<Statement> {
-    let mut i_str: &str = &expand(i);
-    let j = &mut i_str;
-    let s = separated(1.., statement, alt((",", ";")))
+fn program(i: &mut &str) -> PResult<Statement> {
+    separated(1.., statement, alt((",", ";")))
         .map(|stmts| Statement::Sequence(stmts))
-        .parse_next(j)?;
-    Ok(s)
+        .parse_next(i)
 }
 
 fn statement(i: &mut &str) -> PResult<Statement> {
@@ -90,13 +92,84 @@ fn ternary(i: &mut &str) -> PResult<Expr> {
     ))
 }
 
+// fn scalar(i: &mut &str) -> PResult<Expr> {
+//     let negation = opt('-').map(|op| op.is_some());
+//     let expression = delimited(
+//         multispaces,
+//         alt((float.map(Expr::Scalar), function, parens, variable, ternary)),
+//         multispaces,
+//     );
+//     (negation, expression)
+//         .map(|(n, e)| if n { Expr::Negate(Box::new(e)) } else { e })
+//         .parse_next(i)
+// }
+
 fn expr(i: &mut &str) -> PResult<Expr> {
     delimited(
         multispaces,
-        alt((ternary, comp, sum, product, function)),
+        alt((
+            sum,
+            product,
+            function,
+            parens,
+            variable,
+            ternary,
+            comp,
+            float.map(Expr::Scalar),
+        )),
         multispaces,
     )
     .parse_next(i)
+}
+
+fn comp(i: &mut &str) -> PResult<Expr> {
+    use BinOp::*;
+    let lhs = sum.parse_next(i)?;
+    let op = alt((gt, ge, lt, le, equal)).parse_next(i)?;
+    let rhs = sum.parse_next(i)?;
+    match op {
+        "==" => Ok(Expr::BinaryOp(Eq(Box::new(lhs), Box::new(rhs)))),
+        ">=" => Ok(Expr::BinaryOp(GreaterEq(Box::new(lhs), Box::new(rhs)))),
+        "<=" => Ok(Expr::BinaryOp(LessEq(Box::new(lhs), Box::new(rhs)))),
+        ">" => Ok(Expr::BinaryOp(Greater(Box::new(lhs), Box::new(rhs)))),
+        _ => Ok(Expr::BinaryOp(Less(Box::new(lhs), Box::new(rhs)))),
+    }
+}
+
+fn sum(i: &mut &str) -> PResult<Expr> {
+    use BinOp::*;
+    let init = product.parse_next(i)?;
+
+    repeat(0.., (one_of(['+', '-']), product))
+        .fold(
+            move || init.clone(),
+            |acc, (op, val): (char, Expr)| {
+                if op == '+' {
+                    Expr::BinaryOp(Add(Box::new(acc), Box::new(val)))
+                } else {
+                    Expr::BinaryOp(Sub(Box::new(acc), Box::new(val)))
+                }
+            },
+        )
+        .parse_next(i)
+}
+
+fn product(i: &mut &str) -> PResult<Expr> {
+    use BinOp::*;
+    let init = expr.parse_next(i)?;
+
+    repeat(0.., (one_of(['*', '/']), expr))
+        .fold(
+            move || init.clone(),
+            |acc, (op, val): (char, Expr)| {
+                if op == '*' {
+                    Expr::BinaryOp(Mul(Box::new(acc), Box::new(val)))
+                } else {
+                    Expr::BinaryOp(Div(Box::new(acc), Box::new(val)))
+                }
+            },
+        )
+        .parse_next(i)
 }
 
 fn assign_scalar(i: &mut &str) -> PResult<Statement> {
@@ -190,74 +263,6 @@ fn assign_inc(i: &mut &str) -> PResult<Statement> {
 
 fn return_statement(i: &mut &str) -> PResult<Statement> {
     expr.map(|e| Statement::Return(Box::new(e))).parse_next(i)
-}
-
-fn comp(i: &mut &str) -> PResult<Expr> {
-    use BinOp::*;
-    let lhs = sum.parse_next(i)?;
-    let op = alt((gt, ge, lt, le, equal)).parse_next(i)?;
-    let rhs = sum.parse_next(i)?;
-    match op {
-        "==" => Ok(Expr::BinaryOp(Eq(Box::new(lhs), Box::new(rhs)))),
-        ">=" => Ok(Expr::BinaryOp(GreaterEq(Box::new(lhs), Box::new(rhs)))),
-        "<=" => Ok(Expr::BinaryOp(LessEq(Box::new(lhs), Box::new(rhs)))),
-        ">" => Ok(Expr::BinaryOp(Greater(Box::new(lhs), Box::new(rhs)))),
-        _ => Ok(Expr::BinaryOp(Less(Box::new(lhs), Box::new(rhs)))),
-    }
-}
-
-fn sum(i: &mut &str) -> PResult<Expr> {
-    use BinOp::*;
-    let init = product.parse_next(i)?;
-
-    repeat(0.., (one_of(['+', '-']), product))
-        .fold(
-            move || init.clone(),
-            |acc, (op, val): (char, Expr)| {
-                if op == '+' {
-                    Expr::BinaryOp(Add(Box::new(acc), Box::new(val)))
-                } else {
-                    Expr::BinaryOp(Sub(Box::new(acc), Box::new(val)))
-                }
-            },
-        )
-        .parse_next(i)
-}
-
-fn product(i: &mut &str) -> PResult<Expr> {
-    use BinOp::*;
-    let init = scalar.parse_next(i)?;
-
-    repeat(0.., (one_of(['*', '/']), scalar))
-        .fold(
-            move || init.clone(),
-            |acc, (op, val): (char, Expr)| {
-                if op == '*' {
-                    Expr::BinaryOp(Mul(Box::new(acc), Box::new(val)))
-                } else {
-                    Expr::BinaryOp(Div(Box::new(acc), Box::new(val)))
-                }
-            },
-        )
-        .parse_next(i)
-}
-
-fn scalar(i: &mut &str) -> PResult<Expr> {
-    let negation = opt('-').map(|op| op.is_some());
-    let expr = delimited(
-        multispaces,
-        alt((float.map(Expr::Scalar), function, parens, variable, ternary)),
-        multispaces,
-    );
-    (negation, expr)
-        .map(|(negated, expr)| {
-            if negated {
-                Expr::Negate(Box::new(expr))
-            } else {
-                expr
-            }
-        })
-        .parse_next(i)
 }
 
 fn identifier(i: &mut &str) -> PResult<String> {
@@ -355,6 +360,7 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "sabs".map(|_| SmoothAbs),
             "round".map(|_| Round),
             "qcl".map(|_| PolySmoothClamp),
+            "g".map(|_| FakeSine),
             // 21
         )),
     ))
@@ -377,7 +383,9 @@ fn arg_list(i: &mut &str) -> PResult<Vec<Expr>> {
 }
 
 fn args(i: &mut &str) -> PResult<Vec<Expr>> {
-    alt((arg_list, separated(0.., expr, ","))).parse_next(i)
+    let r = alt((arg_list, separated(0.., expr, ","))).parse_next(i)?;
+    let _ = opt(comma).parse_next(i);
+    Ok(r)
 }
 
 fn function(i: &mut &str) -> PResult<Expr> {
@@ -398,15 +406,30 @@ mod tests {
     //     }
 
     #[test]
+    fn ts() {
+        // let input = "L(z,y,x)-8,L(x,z,y)-8,L(y,x,z)-8,";
+        let input = "1,2,3";
+        // let s: IResult<&str, Vec<&str>> = separated(0.., "a", ",").parse_peek(input);
+        let s = args.parse_peek(input);
+        let _ = dbg!(s);
+    }
+
+    #[test]
     fn tt() {
         // let input = "s=1;@5{@xyz{$=B($*2)-8,}s*=.5,}(L(x,y,z)-8)*s";
         // let input = "s=2.5,h=s/2,d=(s+h)/2,q=20,y-=10,[x,y]=r0(x,y),@xyz{$/=q,}c=1,t=0,@7{@xyz{$=mod($-h,s)-h,}t=d/D([x,y,z],[x,y,z]),@xyzc{$*=t,}}d=L(x,y,z)/c*2.-.025";
         // let input =  "[x,z]=r0(x,z), x+=11, z+=15, y+=10, h=exp(-1.5*B(nz(x,0,z,.1,1))), g=y-10*h-nz(x,0,z,10,1)*0.05, b = y-12, a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8,),1.5 )-nz(x,0,z,12,1)*0.15, s=(L(x>7?(mod(x,4)-2)/2:x,x<1?y:b/3+2,B(z)-1.5)-1.8)-nz(x,y,z,.5,1)*2, rG(U(a,g),-s,1)";
-        // let input = "a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8,),1.5 )-nz(x,0,z,12,1)*0.15"; //, rG(U(a,g),-s,1)";
+        // let input = "a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8,),1.5 )-nz(x,0,z,12,1)*0.15", rG(U(a,g),-s,1)";
         // let input = "x>7?(mod(x,4)-2)/2:x";
-        let input = "b=0; a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8),1.5 )";
+        // let input = "b=0; a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8),1.5 )";
+        // let input = "s=.5,y+=6, a=k(y+22,B(z+10*g(x*.005+.2))-16)-4,b=TR(x/40+.2)*40,c; [b,y]=r1(b,y), [y,z]=r0(y,z+15), r=rU(U(@byz{bx2(B($$$)-20,bx2($,$$,23)+3,3)-.4,}),a,3)"; //, @4{ [x,y]=r1(x,y), [y,z]=r0(y,z), a=nz(x,y,z,.02/s,$+5), a=B(a)*50-3, r=rU(r,rG(r-7*s,a*s,s*2),s*2), s*=.5, } r";
         // let input = "a=rU(1,2,3,4,5,6)";
-        dbg!(program.parse_peek(input));
+        // let input = "a=k(y+22, 2)";
+        let input = "U(@xyz{L($$$,$$,$)-8,})";
+        let i = &expand(input);
+        dbg!(&i);
+        // let input = "U(L(z,y,x)-8,L(x,z,y)-8,L(y,x,z)-8)";
+        let _ = dbg!(program.parse_peek(i));
     }
     #[test]
     fn no_more_ray() {
@@ -572,7 +595,7 @@ mod tests {
         let input = "a=z*-0.004+0.1";
         let expected = Ok((
             "",
-            String::from("Assign { var: \"a\", rhs: BinaryOp(Add(BinaryOp(Mul(Variable(\"z\"), Scalar(-0.004))), Scalar(0.1))) }"),
+            String::from("Assign { var: \"a\", rhs: BinaryOp(Add(BinaryOp(Mul(Variable(\"z\"), Negate(Scalar(0.004)))), Scalar(0.1))) }"),
         ));
         assert_eq!(
             assign_scalar.map(|e| format!("{e:?}")).parse_peek(input),
@@ -580,24 +603,24 @@ mod tests {
         );
     }
 
-    #[test]
-    fn scalar_test() {
-        let input = "3.0";
-        let expected = Ok(("", String::from("Scalar(3.0)")));
-        assert_eq!(scalar.map(|e| format!("{e:?}")).parse_peek(input), expected);
+    // #[test]
+    // fn scalar_test() {
+    //     let input = "3.0";
+    //     let expected = Ok(("", String::from("Scalar(3.0)")));
+    //     assert_eq!(scalar.map(|e| format!("{e:?}")).parse_peek(input), expected);
 
-        let input = " 12.1";
-        let expected = Ok(("", String::from("Scalar(12.1)")));
-        assert_eq!(scalar.map(|e| format!("{e:?}")).parse_peek(input), expected);
+    //     let input = " 12.1";
+    //     let expected = Ok(("", String::from("Scalar(12.1)")));
+    //     assert_eq!(scalar.map(|e| format!("{e:?}")).parse_peek(input), expected);
 
-        let input = "537.23 ";
-        let expected = Ok(("", String::from("Scalar(537.23)")));
-        assert_eq!(scalar.map(|e| format!("{e:?}")).parse_peek(input), expected);
+    //     let input = "537.23 ";
+    //     let expected = Ok(("", String::from("Scalar(537.23)")));
+    //     assert_eq!(scalar.map(|e| format!("{e:?}")).parse_peek(input), expected);
 
-        let input = "  24.456     ";
-        let expected = Ok(("", String::from("Scalar(24.456)")));
-        assert_eq!(scalar.map(|e| format!("{e:?}")).parse_peek(input), expected);
-    }
+    //     let input = "  24.456     ";
+    //     let expected = Ok(("", String::from("Scalar(24.456)")));
+    //     assert_eq!(scalar.map(|e| format!("{e:?}")).parse_peek(input), expected);
+    // }
 
     #[test]
     fn product_test() {
@@ -674,7 +697,7 @@ mod tests {
         let input = "cl(-2.0 * 5.1, 0.0, 10.0)";
         let expected = Ok((
             "",
-            String::from("Function { name: Clamp, args: [BinaryOp(Mul(Scalar(-2.0), Scalar(5.1))), Scalar(0.0), Scalar(10.0)] }"),
+            String::from("Function { name: Clamp, args: [BinaryOp(Mul(Negate(Scalar(2.0)), Scalar(5.1))), Scalar(0.0), Scalar(10.0)] }"),
         ));
         assert_eq!(
             function.map(|e| format!("{e:?}")).parse_peek(input),
@@ -734,7 +757,9 @@ mod tests {
         let input = "a= -0.004 + 0.1";
         let expected = Ok((
             "",
-            String::from("Assign { var: \"a\", rhs: BinaryOp(Add(Scalar(-0.004), Scalar(0.1))) }"),
+            String::from(
+                "Assign { var: \"a\", rhs: BinaryOp(Add(Negate(Scalar(0.004)), Scalar(0.1))) }",
+            ),
         ));
         assert_eq!(
             assign_scalar.map(|e| format!("{e:?}")).parse_peek(input),
