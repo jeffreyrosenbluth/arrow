@@ -1,6 +1,7 @@
 use crate::ast::*;
 use crate::expand::expand;
 
+// use serde::de;
 use winnow::ascii::{alpha1, alphanumeric0};
 use winnow::combinator::{fail, opt, separated};
 use winnow::prelude::*;
@@ -80,7 +81,6 @@ fn statement(i: &mut &str) -> PResult<Statement> {
 
 fn ternary(i: &mut &str) -> PResult<Expr> {
     let condition = comp.parse_next(i)?;
-    dbg!(&condition);
     delimited(multispaces, "?", multispaces).parse_next(i)?;
     let if_true = expr.parse_next(i)?;
     delimited(multispaces, ":", multispaces).parse_next(i)?;
@@ -105,21 +105,7 @@ fn ternary(i: &mut &str) -> PResult<Expr> {
 // }
 
 fn expr(i: &mut &str) -> PResult<Expr> {
-    delimited(
-        multispaces,
-        alt((
-            sum,
-            product,
-            function,
-            parens,
-            variable,
-            ternary,
-            comp,
-            float.map(Expr::Scalar),
-        )),
-        multispaces,
-    )
-    .parse_next(i)
+    delimited(multispaces, alt((sum, ternary)), multispaces).parse_next(i)
 }
 
 fn comp(i: &mut &str) -> PResult<Expr> {
@@ -156,9 +142,9 @@ fn sum(i: &mut &str) -> PResult<Expr> {
 
 fn product(i: &mut &str) -> PResult<Expr> {
     use BinOp::*;
-    let init = expr.parse_next(i)?;
+    let init = factor.parse_next(i)?;
 
-    repeat(0.., (one_of(['*', '/']), expr))
+    repeat(0.., (one_of(['*', '/']), factor))
         .fold(
             move || init.clone(),
             |acc, (op, val): (char, Expr)| {
@@ -169,6 +155,17 @@ fn product(i: &mut &str) -> PResult<Expr> {
                 }
             },
         )
+        .parse_next(i)
+}
+
+fn factor(i: &mut &str) -> PResult<Expr> {
+    let p = alt((float.map(Expr::Scalar), function, variable, parens));
+    delimited(multispaces, p, multispaces).parse_next(i)
+}
+
+fn parens(i: &mut &str) -> PResult<Expr> {
+    delimited("(", expr, ")")
+        .map(|e| Expr::Paren(Box::new(e)))
         .parse_next(i)
 }
 
@@ -367,12 +364,6 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
     .parse_next(i)
 }
 
-fn parens(i: &mut &str) -> PResult<Expr> {
-    delimited("(", expr, ")")
-        .map(|e| Expr::Paren(Box::new(e)))
-        .parse_next(i)
-}
-
 fn list(i: &mut &str) -> PResult<Vec<Expr>> {
     delimited(lbracket, separated(0.., expr, ","), rbracket).parse_next(i)
 }
@@ -408,7 +399,7 @@ mod tests {
     #[test]
     fn ts() {
         // let input = "L(z,y,x)-8,L(x,z,y)-8,L(y,x,z)-8,";
-        let input = "1,2,3";
+        let input = "1,y+2,3";
         // let s: IResult<&str, Vec<&str>> = separated(0.., "a", ",").parse_peek(input);
         let s = args.parse_peek(input);
         let _ = dbg!(s);
@@ -424,12 +415,11 @@ mod tests {
         // let input = "b=0; a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8),1.5 )";
         // let input = "s=.5,y+=6, a=k(y+22,B(z+10*g(x*.005+.2))-16)-4,b=TR(x/40+.2)*40,c; [b,y]=r1(b,y), [y,z]=r0(y,z+15), r=rU(U(@byz{bx2(B($$$)-20,bx2($,$$,23)+3,3)-.4,}),a,3)"; //, @4{ [x,y]=r1(x,y), [y,z]=r0(y,z), a=nz(x,y,z,.02/s,$+5), a=B(a)*50-3, r=rU(r,rG(r-7*s,a*s,s*2),s*2), s*=.5, } r";
         // let input = "a=rU(1,2,3,4,5,6)";
-        // let input = "a=k(y+22, 2)";
-        let input = "U(@xyz{L($$$,$$,$)-8,})";
+        let input = "k(y+22, 2)";
+        // let input = "U(@xyz{L($$$,$$,$)-8,})";
         let i = &expand(input);
-        dbg!(&i);
         // let input = "U(L(z,y,x)-8,L(x,z,y)-8,L(y,x,z)-8)";
-        let _ = dbg!(program.parse_peek(i));
+        let _ = dbg!(function.parse_peek(i));
     }
     #[test]
     fn no_more_ray() {
