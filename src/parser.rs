@@ -65,12 +65,13 @@ fn statement(i: &mut &str) -> PResult<Statement> {
         alt((
             rbrace.map(|_| Statement::Empty),
             assign_array,
-            assign_scalar,
             assign_add,
             assign_sub,
             assign_mul,
             assign_div,
             assign_inc,
+            assign_dec,
+            assign_scalar,
             return_statement,
             program,
         )),
@@ -91,18 +92,6 @@ fn ternary(i: &mut &str) -> PResult<Expr> {
         Box::new(if_false),
     ))
 }
-
-// fn scalar(i: &mut &str) -> PResult<Expr> {
-//     let negation = opt('-').map(|op| op.is_some());
-//     let expression = delimited(
-//         multispaces,
-//         alt((float.map(Expr::Scalar), function, parens, variable, ternary)),
-//         multispaces,
-//     );
-//     (negation, expression)
-//         .map(|(n, e)| if n { Expr::Negate(Box::new(e)) } else { e })
-//         .parse_next(i)
-// }
 
 fn expr(i: &mut &str) -> PResult<Expr> {
     delimited(multispaces, alt((sum, ternary)), multispaces).parse_next(i)
@@ -159,8 +148,12 @@ fn product(i: &mut &str) -> PResult<Expr> {
 }
 
 fn factor(i: &mut &str) -> PResult<Expr> {
+    let negation = opt('-').map(|op| op.is_some());
     let p = alt((float.map(Expr::Scalar), function, variable, parens));
-    delimited(multispaces, p, multispaces).parse_next(i)
+    let expression = delimited(multispaces, p, multispaces);
+    (negation, expression)
+        .map(|(n, e)| if n { Expr::Negate(Box::new(e)) } else { e })
+        .parse_next(i)
 }
 
 fn parens(i: &mut &str) -> PResult<Expr> {
@@ -252,6 +245,18 @@ fn assign_inc(i: &mut &str) -> PResult<Statement> {
     Ok(Statement::Assign {
         var: var.clone(),
         rhs: Box::new(Expr::BinaryOp(BinOp::Add(
+            Box::new(Expr::Variable(var)),
+            Box::new(Expr::Scalar(1.0)),
+        ))),
+    })
+}
+
+fn assign_dec(i: &mut &str) -> PResult<Statement> {
+    let var = identifier.parse_next(i)?;
+    delimited(multispaces, "--", multispaces).parse_next(i)?;
+    Ok(Statement::Assign {
+        var: var.clone(),
+        rhs: Box::new(Expr::BinaryOp(BinOp::Sub(
             Box::new(Expr::Variable(var)),
             Box::new(Expr::Scalar(1.0)),
         ))),
@@ -358,8 +363,8 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "round".map(|_| Round),
             "qcl".map(|_| PolySmoothClamp),
             "g".map(|_| FakeSine),
-            // 21
         )),
+        "ri".map(|_| Hash),
     ))
     .parse_next(i)
 }
@@ -415,18 +420,19 @@ mod tests {
         // let input = "b=0; a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8),1.5 )";
         // let input = "s=.5,y+=6, a=k(y+22,B(z+10*g(x*.005+.2))-16)-4,b=TR(x/40+.2)*40,c; [b,y]=r1(b,y), [y,z]=r0(y,z+15), r=rU(U(@byz{bx2(B($$$)-20,bx2($,$$,23)+3,3)-.4,}),a,3)"; //, @4{ [x,y]=r1(x,y), [y,z]=r0(y,z), a=nz(x,y,z,.02/s,$+5), a=B(a)*50-3, r=rU(r,rG(r-7*s,a*s,s*2),s*2), s*=.5, } r";
         // let input = "a=rU(1,2,3,4,5,6)";
-        let input = "k(y+22, 2)";
+        // let input = "k(y+22, 2)";
         // let input = "U(@xyz{L($$$,$$,$)-8,})";
+        let input = "i=0, i++";
         let i = &expand(input);
         // let input = "U(L(z,y,x)-8,L(x,z,y)-8,L(y,x,z)-8)";
-        let _ = dbg!(function.parse_peek(i));
+        let _ = dbg!(program.parse_peek(i));
     }
     #[test]
     fn no_more_ray() {
         let input = "U(L(x+28,y-10,z+8)-12, don(x-cl(x,-15,15),y-18,z-20,10,3), bx3(x-20,y-20,z+20,8)-10, L(x+3,y-16)-4)";
         let expected = Ok((
-            input,
-            String::from("Sequence([Return(Function { name: Union, args: [BinaryOp(Sub(Function { name: Length, args: [BinaryOp(Add(Variable(\"x\"), Scalar(28.0))), BinaryOp(Sub(Variable(\"y\"), Scalar(10.0))), BinaryOp(Add(Variable(\"z\"), Scalar(8.0)))] }, Scalar(12.0))), Function { name: Torus, args: [BinaryOp(Sub(Variable(\"x\"), Function { name: Clamp, args: [Variable(\"x\"), Scalar(-15.0), Scalar(15.0)] })), BinaryOp(Sub(Variable(\"y\"), Scalar(18.0))), BinaryOp(Sub(Variable(\"z\"), Scalar(20.0))), Scalar(10.0), Scalar(3.0)] }, BinaryOp(Sub(Function { name: Box3, args: [BinaryOp(Sub(Variable(\"x\"), Scalar(20.0))), BinaryOp(Sub(Variable(\"y\"), Scalar(20.0))), BinaryOp(Add(Variable(\"z\"), Scalar(20.0))), Scalar(8.0)] }, Scalar(10.0))), BinaryOp(Sub(Function { name: Length, args: [BinaryOp(Add(Variable(\"x\"), Scalar(3.0))), BinaryOp(Sub(Variable(\"y\"), Scalar(16.0)))] }, Scalar(4.0)))] })])"),
+            "",
+            String::from("Sequence([Return(Function { name: Union, args: [BinaryOp(Sub(Function { name: Length, args: [BinaryOp(Add(Variable(\"x\"), Scalar(28.0))), BinaryOp(Sub(Variable(\"y\"), Scalar(10.0))), BinaryOp(Add(Variable(\"z\"), Scalar(8.0)))] }, Scalar(12.0))), Function { name: Torus, args: [BinaryOp(Sub(Variable(\"x\"), Function { name: Clamp, args: [Variable(\"x\"), Negate(Scalar(15.0)), Scalar(15.0)] })), BinaryOp(Sub(Variable(\"y\"), Scalar(18.0))), BinaryOp(Sub(Variable(\"z\"), Scalar(20.0))), Scalar(10.0), Scalar(3.0)] }, BinaryOp(Sub(Function { name: Box3, args: [BinaryOp(Sub(Variable(\"x\"), Scalar(20.0))), BinaryOp(Sub(Variable(\"y\"), Scalar(20.0))), BinaryOp(Add(Variable(\"z\"), Scalar(20.0))), Scalar(8.0)] }, Scalar(10.0))), BinaryOp(Sub(Function { name: Length, args: [BinaryOp(Add(Variable(\"x\"), Scalar(3.0))), BinaryOp(Sub(Variable(\"y\"), Scalar(16.0)))] }, Scalar(4.0)))] })])"),
         ));
         assert_eq!(
             program.map(|e| format!("{e:?}")).parse_peek(input),
@@ -437,7 +443,7 @@ mod tests {
     #[test]
     fn random_python() {
         let input = "U(don(mod(x+-8.22,4.46),mod(y+3.88,4.36),TR(z+5.17),4.19,9.74),bx3(x+8.88,y+3.14,z+-7.53,6.72,2.08,8.98)-3.77,bx3(x+-0.14,mod(y+-2.22,4.17),z+-2.84,1.88,3.59,6.38)-0.57,L(x+4.15,TR(y+-4.79),mod(z+9.16,-4.84))-0.16,don(B(x+-0.87)-4,B(y+-3.58)-3,TR(z+-8.70),9.79,8.58),L(x+9.67,B(y+6.01)-5)-4.49,L(B(x+-4.68)-4,y+-8.46)-1.78,don(x+-6.66,y+4.27,z+6.62,4.38,8.19))";
-        let expected = Ok((input, String::from("Sequence([Return(Function { name: Union, args: [Function { name: Torus, args: [Function { name: Mod, args: [BinaryOp(Add(Variable(\"x\"), Scalar(-8.22))), Scalar(4.46)] }, Function { name: Mod, args: [BinaryOp(Add(Variable(\"y\"), Scalar(3.88))), Scalar(4.36)] }, Function { name: Triangle, args: [BinaryOp(Add(Variable(\"z\"), Scalar(5.17)))] }, Scalar(4.19), Scalar(9.74)] }, BinaryOp(Sub(Function { name: Box3, args: [BinaryOp(Add(Variable(\"x\"), Scalar(8.88))), BinaryOp(Add(Variable(\"y\"), Scalar(3.14))), BinaryOp(Add(Variable(\"z\"), Scalar(-7.53))), Scalar(6.72), Scalar(2.08), Scalar(8.98)] }, Scalar(3.77))), BinaryOp(Sub(Function { name: Box3, args: [BinaryOp(Add(Variable(\"x\"), Scalar(-0.14))), Function { name: Mod, args: [BinaryOp(Add(Variable(\"y\"), Scalar(-2.22))), Scalar(4.17)] }, BinaryOp(Add(Variable(\"z\"), Scalar(-2.84))), Scalar(1.88), Scalar(3.59), Scalar(6.38)] }, Scalar(0.57))), BinaryOp(Sub(Function { name: Length, args: [BinaryOp(Add(Variable(\"x\"), Scalar(4.15))), Function { name: Triangle, args: [BinaryOp(Add(Variable(\"y\"), Scalar(-4.79)))] }, Function { name: Mod, args: [BinaryOp(Add(Variable(\"z\"), Scalar(9.16))), Scalar(-4.84)] }] }, Scalar(0.16))), Function { name: Torus, args: [BinaryOp(Sub(Function { name: Abs, args: [BinaryOp(Add(Variable(\"x\"), Scalar(-0.87)))] }, Scalar(4.0))), BinaryOp(Sub(Function { name: Abs, args: [BinaryOp(Add(Variable(\"y\"), Scalar(-3.58)))] }, Scalar(3.0))), Function { name: Triangle, args: [BinaryOp(Add(Variable(\"z\"), Scalar(-8.7)))] }, Scalar(9.79), Scalar(8.58)] }, BinaryOp(Sub(Function { name: Length, args: [BinaryOp(Add(Variable(\"x\"), Scalar(9.67))), BinaryOp(Sub(Function { name: Abs, args: [BinaryOp(Add(Variable(\"y\"), Scalar(6.01)))] }, Scalar(5.0)))] }, Scalar(4.49))), BinaryOp(Sub(Function { name: Length, args: [BinaryOp(Sub(Function { name: Abs, args: [BinaryOp(Add(Variable(\"x\"), Scalar(-4.68)))] }, Scalar(4.0))), BinaryOp(Add(Variable(\"y\"), Scalar(-8.46)))] }, Scalar(1.78))), Function { name: Torus, args: [BinaryOp(Add(Variable(\"x\"), Scalar(-6.66))), BinaryOp(Add(Variable(\"y\"), Scalar(4.27))), BinaryOp(Add(Variable(\"z\"), Scalar(6.62))), Scalar(4.38), Scalar(8.19)] }] })])")));
+        let expected = Ok(("", String::from("Sequence([Return(Function { name: Union, args: [Function { name: Torus, args: [Function { name: Mod, args: [BinaryOp(Add(Variable(\"x\"), Negate(Scalar(8.22)))), Scalar(4.46)] }, Function { name: Mod, args: [BinaryOp(Add(Variable(\"y\"), Scalar(3.88))), Scalar(4.36)] }, Function { name: Triangle, args: [BinaryOp(Add(Variable(\"z\"), Scalar(5.17)))] }, Scalar(4.19), Scalar(9.74)] }, BinaryOp(Sub(Function { name: Box3, args: [BinaryOp(Add(Variable(\"x\"), Scalar(8.88))), BinaryOp(Add(Variable(\"y\"), Scalar(3.14))), BinaryOp(Add(Variable(\"z\"), Negate(Scalar(7.53)))), Scalar(6.72), Scalar(2.08), Scalar(8.98)] }, Scalar(3.77))), BinaryOp(Sub(Function { name: Box3, args: [BinaryOp(Add(Variable(\"x\"), Negate(Scalar(0.14)))), Function { name: Mod, args: [BinaryOp(Add(Variable(\"y\"), Negate(Scalar(2.22)))), Scalar(4.17)] }, BinaryOp(Add(Variable(\"z\"), Negate(Scalar(2.84)))), Scalar(1.88), Scalar(3.59), Scalar(6.38)] }, Scalar(0.57))), BinaryOp(Sub(Function { name: Length, args: [BinaryOp(Add(Variable(\"x\"), Scalar(4.15))), Function { name: Triangle, args: [BinaryOp(Add(Variable(\"y\"), Negate(Scalar(4.79))))] }, Function { name: Mod, args: [BinaryOp(Add(Variable(\"z\"), Scalar(9.16))), Negate(Scalar(4.84))] }] }, Scalar(0.16))), Function { name: Torus, args: [BinaryOp(Sub(Function { name: Abs, args: [BinaryOp(Add(Variable(\"x\"), Negate(Scalar(0.87))))] }, Scalar(4.0))), BinaryOp(Sub(Function { name: Abs, args: [BinaryOp(Add(Variable(\"y\"), Negate(Scalar(3.58))))] }, Scalar(3.0))), Function { name: Triangle, args: [BinaryOp(Add(Variable(\"z\"), Negate(Scalar(8.7))))] }, Scalar(9.79), Scalar(8.58)] }, BinaryOp(Sub(Function { name: Length, args: [BinaryOp(Add(Variable(\"x\"), Scalar(9.67))), BinaryOp(Sub(Function { name: Abs, args: [BinaryOp(Add(Variable(\"y\"), Scalar(6.01)))] }, Scalar(5.0)))] }, Scalar(4.49))), BinaryOp(Sub(Function { name: Length, args: [BinaryOp(Sub(Function { name: Abs, args: [BinaryOp(Add(Variable(\"x\"), Negate(Scalar(4.68))))] }, Scalar(4.0))), BinaryOp(Add(Variable(\"y\"), Negate(Scalar(8.46))))] }, Scalar(1.78))), Function { name: Torus, args: [BinaryOp(Add(Variable(\"x\"), Negate(Scalar(6.66)))), BinaryOp(Add(Variable(\"y\"), Scalar(4.27))), BinaryOp(Add(Variable(\"z\"), Scalar(6.62))), Scalar(4.38), Scalar(8.19)] }] })])")));
         assert_eq!(
             program.map(|e| format!("{e:?}")).parse_peek(input),
             expected
@@ -455,23 +461,11 @@ mod tests {
     }
 
     #[test]
-    fn pathways() {
-        let input = "s=10,[x,z]=r0(x,z),[y,z]=r1(z,y),[y,x]=r0(y,x),@xyz{$m=mod($,1)-.5,}b=bx3(xm,ym,zm,.45)-.05,t=[0,2,3,1],i=1,n=(a=i++)=>nz(z,x,y,.01,a,a==1?2:1)*t[a]*100,@yxz{$+=n(),}@xz{$b=mod($,s*2)-s,}rG(b,bx2(bx2(xb,zb,s),TR((y+2)/40)*40,1,2.2)-.2,.3)-.1";
-        let expected = Ok((input, String::from("Sequence([Assign { var: \"s\", rhs: Scalar(10.0) }, AssignArray { vars: [\"x\", \"z\"], rhs: Function { name: Rot0, args: [Variable(\"x\"), Variable(\"z\")] } }, AssignArray { vars: [\"y\", \"z\"], rhs: Function { name: Rot1, args: [Variable(\"z\"), Variable(\"y\")] } }, AssignArray { vars: [\"y\", \"x\"], rhs: Function { name: Rot0, args: [Variable(\"y\"), Variable(\"x\")] } }, Assign { var: \"xm\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"x\"), Scalar(1.0)] }, Scalar(0.5))) }, Assign { var: \"ym\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"y\"), Scalar(1.0)] }, Scalar(0.5))) }, Assign { var: \"zm\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"z\"), Scalar(1.0)] }, Scalar(0.5))) }, Assign { var: \"b\", rhs: BinaryOp(Sub(Function { name: Box3, args: [Variable(\"xm\"), Variable(\"ym\"), Variable(\"zm\"), Scalar(0.45)] }, Scalar(0.05))) }, Return(Variable(\"t\"))])")));
-        assert_eq!(
-            program.map(|e| format!("{e:?}")).parse_peek(input),
-            expected
-        );
-    }
-
-    #[test]
     fn quanta() {
         let input = "s=20,[x,z]=r0(x,z),[y,x]=r1(y,x),z+=17,y+=27,i=0,z+=ri(Z(x/s))*70,@xz{$-=nz(x,y,z,.1,i++)*5*i,$i=Z($/s),$=mod($,s)-s/2,}i=ri(xi,zi),j=ri(xi,floor(y/5)),d=i>.1?rU(L(x,z)-1*i-.5*(cos(y/4)+1),bx2(L(x,z)-(cos(floor(y/4))+1)*2,mod(y,4)-2,.1,.2)-.05,1):L(x,mod(y,5)-2.5,z)-G(j,0)*2";
-        let expected = Ok((input, String::from("Sequence([Assign { var: \"s\", rhs: Scalar(20.0) }, AssignArray { vars: [\"x\", \"z\"], rhs: Function { name: Rot0, args: [Variable(\"x\"), Variable(\"z\")] } }, AssignArray { vars: [\"y\", \"x\"], rhs: Function { name: Rot1, args: [Variable(\"y\"), Variable(\"x\")] } }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), Scalar(17.0))) }, Assign { var: \"y\", rhs: BinaryOp(Add(Variable(\"y\"), Scalar(27.0))) }, Assign { var: \"i\", rhs: Scalar(0.0) }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), Variable(\"ri\"))) }])")));
-        assert_eq!(
-            program.map(|e| format!("{e:?}")).parse_peek(input),
-            expected
-        );
+        let i = expand(input);
+        let expected = Ok(("", String::from("Sequence([Assign { var: \"s\", rhs: Scalar(20.0) }, AssignArray { vars: [\"x\", \"z\"], rhs: Function { name: Rot0, args: [Variable(\"x\"), Variable(\"z\")] } }, AssignArray { vars: [\"y\", \"x\"], rhs: Function { name: Rot1, args: [Variable(\"y\"), Variable(\"x\")] } }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), Scalar(17.0))) }, Assign { var: \"y\", rhs: BinaryOp(Add(Variable(\"y\"), Scalar(27.0))) }, Assign { var: \"i\", rhs: Scalar(0.0) }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), Variable(\"ri\"))) }])")));
+        assert_eq!(program.map(|e| format!("{e:?}")).parse_peek(&i), expected);
     }
 
     #[test]
@@ -495,7 +489,7 @@ mod tests {
 
         let input = "p=B(y-18)-13,n=nz(x,y,z,.4,0,2)*2,q=mod(p,12+n*z)-1.8";
         let expected = Ok((
-            input,
+            "",
             String::from("Sequence([Assign { var: \"p\", rhs: BinaryOp(Sub(Function { name: Abs, args: [BinaryOp(Sub(Variable(\"y\"), Scalar(18.0)))] }, Scalar(13.0))) }, Assign { var: \"n\", rhs: BinaryOp(Mul(Function { name: ValueNoise, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\"), Scalar(0.4), Scalar(0.0), Scalar(2.0)] }, Scalar(2.0))) }, Assign { var: \"q\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"p\"), BinaryOp(Add(Scalar(12.0), BinaryOp(Mul(Variable(\"n\"), Variable(\"z\")))))] }, Scalar(1.8))) }])"),
         ));
         assert_eq!(
@@ -505,7 +499,7 @@ mod tests {
 
         let input = "a = 1.0, a++";
         let expected = Ok((
-            input,
+            "",
             String::from("Sequence([Assign { var: \"a\", rhs: Scalar(1.0) }, Assign { var: \"a\", rhs: BinaryOp(Add(Variable(\"a\"), Scalar(1.0))) }])"),
         ));
         assert_eq!(
@@ -514,14 +508,12 @@ mod tests {
         );
 
         let input = "@xyz{$=B($)-6,} L(x,y,z)-5";
+        let i = expand(input);
         let expected = Ok((
-            input,
+            "",
             String::from("Sequence([Assign { var: \"x\", rhs: BinaryOp(Sub(Function { name: Abs, args: [Variable(\"x\")] }, Scalar(6.0))) }, Assign { var: \"y\", rhs: BinaryOp(Sub(Function { name: Abs, args: [Variable(\"y\")] }, Scalar(6.0))) }, Assign { var: \"z\", rhs: BinaryOp(Sub(Function { name: Abs, args: [Variable(\"z\")] }, Scalar(6.0))) }, Return(BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\")] }, Scalar(5.0))))])")),
         );
-        assert_eq!(
-            program.map(|e| format!("{e:?}")).parse_peek(input),
-            expected
-        );
+        assert_eq!(program.map(|e| format!("{e:?}")).parse_peek(&i), expected);
     }
 
     #[test]
@@ -592,25 +584,6 @@ mod tests {
             expected
         );
     }
-
-    // #[test]
-    // fn scalar_test() {
-    //     let input = "3.0";
-    //     let expected = Ok(("", String::from("Scalar(3.0)")));
-    //     assert_eq!(scalar.map(|e| format!("{e:?}")).parse_peek(input), expected);
-
-    //     let input = " 12.1";
-    //     let expected = Ok(("", String::from("Scalar(12.1)")));
-    //     assert_eq!(scalar.map(|e| format!("{e:?}")).parse_peek(input), expected);
-
-    //     let input = "537.23 ";
-    //     let expected = Ok(("", String::from("Scalar(537.23)")));
-    //     assert_eq!(scalar.map(|e| format!("{e:?}")).parse_peek(input), expected);
-
-    //     let input = "  24.456     ";
-    //     let expected = Ok(("", String::from("Scalar(24.456)")));
-    //     assert_eq!(scalar.map(|e| format!("{e:?}")).parse_peek(input), expected);
-    // }
 
     #[test]
     fn product_test() {

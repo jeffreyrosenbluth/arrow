@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::core::{fbm, modulo, v3, I, ZERO3};
+use crate::core::{fbm, hash, modulo, v3, I, ZERO3};
 use crate::sdf::{sd_box, sd_torus};
 use glam::{Mat2, Vec2, Vec3};
 use std::collections::HashMap;
@@ -883,6 +883,23 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                     ScalarVal(octaves),
                 ) => ScalarVal(fbm(x, y, z, scale, offset, octaves as u32)),
                 _ => panic!("noise expects scalar values"),
+            }
+        }
+        Hash => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let y = if args.len() > 1 {
+                eval_expr(env, Box::new(args[2].clone()))
+            } else {
+                ScalarVal(0.0)
+            };
+            let z = if args.len() > 2 {
+                eval_expr(env, Box::new(args[2].clone()))
+            } else {
+                ScalarVal(0.0)
+            };
+            match (x, y, z) {
+                (ScalarVal(x), ScalarVal(y), ScalarVal(z)) => ScalarVal(hash(v3(x, y, z))),
+                _ => panic!("hash expects scalar values"),
             }
         }
     }

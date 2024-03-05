@@ -91,6 +91,7 @@ pub enum FunctionName {
     RoundMin,
     Round,
     FakeSine,
+    Hash,
 }
 
 #[derive(Debug, Clone, Serialize)]

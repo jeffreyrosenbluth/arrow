@@ -174,7 +174,7 @@ impl Noise {
     }
 }
 
-fn hash(p: Vec3) -> f32 // replace this by something better
+pub fn hash(p: Vec3) -> f32 // replace this by something better
 {
     let mut p = (p * 0.3183099 + 0.1).fract();
     p *= 17.0;
