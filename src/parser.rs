@@ -94,7 +94,7 @@ fn ternary(i: &mut &str) -> PResult<Expr> {
 }
 
 fn expr(i: &mut &str) -> PResult<Expr> {
-    delimited(multispaces, alt((sum, ternary)), multispaces).parse_next(i)
+    delimited(multispaces, alt((ternary, sum)), multispaces).parse_next(i)
 }
 
 fn comp(i: &mut &str) -> PResult<Expr> {
@@ -149,11 +149,21 @@ fn product(i: &mut &str) -> PResult<Expr> {
 
 fn factor(i: &mut &str) -> PResult<Expr> {
     let negation = opt('-').map(|op| op.is_some());
-    let p = alt((float.map(Expr::Scalar), function, variable, parens));
+    let p = alt((float.map(Expr::Scalar), assign, function, variable, parens));
     let expression = delimited(multispaces, p, multispaces);
     (negation, expression)
         .map(|(n, e)| if n { Expr::Negate(Box::new(e)) } else { e })
         .parse_next(i)
+}
+
+fn assign(i: &mut &str) -> PResult<Expr> {
+    let var = identifier.parse_next(i)?;
+    let op = delimited(multispaces, alt(("++", "--")), multispaces).parse_next(i)?;
+    if op == "++" {
+        Ok(Expr::Assign(AssignExpr::Inc(var)))
+    } else {
+        Ok(Expr::Assign(AssignExpr::Dec(var)))
+    }
 }
 
 fn parens(i: &mut &str) -> PResult<Expr> {
@@ -329,7 +339,7 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "N".map(|_| Normalize),
             "U".map(|_| Union),
             "G".map(|_| Intersect),
-            "Z".map(|_| Floors),
+            "Z".map(|_| Floor),
             "nz".map(|_| ValueNoise),
             "don".map(|_| Torus),
             "bx2".map(|_| Box2),
@@ -346,7 +356,8 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "r1".map(|_| Rot1),
             "rG".map(|_| RoundMax),
             "rmax".map(|_| RoundMax),
-            "rU".map(|_| RoundMin),
+            "rU".map(|_| Union),
+            // "rU".map(|_| RoundMin),
             "rmin".map(|_| RoundMin),
             "acos".map(|_| Acos),
             "asin".map(|_| Asin),
@@ -416,13 +427,13 @@ mod tests {
         // let input = "s=2.5,h=s/2,d=(s+h)/2,q=20,y-=10,[x,y]=r0(x,y),@xyz{$/=q,}c=1,t=0,@7{@xyz{$=mod($-h,s)-h,}t=d/D([x,y,z],[x,y,z]),@xyzc{$*=t,}}d=L(x,y,z)/c*2.-.025";
         // let input =  "[x,z]=r0(x,z), x+=11, z+=15, y+=10, h=exp(-1.5*B(nz(x,0,z,.1,1))), g=y-10*h-nz(x,0,z,10,1)*0.05, b = y-12, a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8,),1.5 )-nz(x,0,z,12,1)*0.15, s=(L(x>7?(mod(x,4)-2)/2:x,x<1?y:b/3+2,B(z)-1.5)-1.8)-nz(x,y,z,.5,1)*2, rG(U(a,g),-s,1)";
         // let input = "a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8,),1.5 )-nz(x,0,z,12,1)*0.15", rG(U(a,g),-s,1)";
-        // let input = "x>7?(mod(x,4)-2)/2:x";
+        let input = "x>7?(mod(x,4)-2)/2:x";
         // let input = "b=0; a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8),1.5 )";
         // let input = "s=.5,y+=6, a=k(y+22,B(z+10*g(x*.005+.2))-16)-4,b=TR(x/40+.2)*40,c; [b,y]=r1(b,y), [y,z]=r0(y,z+15), r=rU(U(@byz{bx2(B($$$)-20,bx2($,$$,23)+3,3)-.4,}),a,3)"; //, @4{ [x,y]=r1(x,y), [y,z]=r0(y,z), a=nz(x,y,z,.02/s,$+5), a=B(a)*50-3, r=rU(r,rG(r-7*s,a*s,s*2),s*2), s*=.5, } r";
         // let input = "a=rU(1,2,3,4,5,6)";
         // let input = "k(y+22, 2)";
         // let input = "U(@xyz{L($$$,$$,$)-8,})";
-        let input = "i=0, i++";
+        // let input = "i=0, sin(i++)";
         let i = &expand(input);
         // let input = "U(L(z,y,x)-8,L(x,z,y)-8,L(y,x,z)-8)";
         let _ = dbg!(program.parse_peek(i));
@@ -453,18 +464,17 @@ mod tests {
     #[test]
     fn g67() {
         let input = "s=10; @1{a=sin(y),b=sin(x),c=sin(z),d=x,e=s+1,} SM(a,b,c,d,e)-5";
-        let expected =Ok((input, String::from("Sequence([Assign { var: \"s\", rhs: Scalar(10.0) }, Assign { var: \"a\", rhs: Function { name: Sin, args: [Variable(\"y\")] } }, Assign { var: \"b\", rhs: Function { name: Sin, args: [Variable(\"x\")] } }, Assign { var: \"c\", rhs: Function { name: Sin, args: [Variable(\"z\")] } }, Assign { var: \"d\", rhs: Variable(\"x\") }, Assign { var: \"e\", rhs: BinaryOp(Add(Variable(\"s\"), Scalar(1.0))) }, Return(BinaryOp(Sub(Function { name: Smoothstep, args: [Variable(\"a\"), Variable(\"b\"), Variable(\"c\"), Variable(\"d\"), Variable(\"e\")] }, Scalar(5.0))))])")));
-        assert_eq!(
-            program.map(|e| format!("{e:?}")).parse_peek(input),
-            expected
-        );
+        let i = expand(input);
+        dbg!(&i);
+        let expected =Ok(("", String::from("Sequence([Assign { var: \"s\", rhs: Scalar(10.0) }, Assign { var: \"a\", rhs: Function { name: Sin, args: [Variable(\"y\")] } }, Assign { var: \"b\", rhs: Function { name: Sin, args: [Variable(\"x\")] } }, Assign { var: \"c\", rhs: Function { name: Sin, args: [Variable(\"z\")] } }, Assign { var: \"d\", rhs: Variable(\"x\") }, Assign { var: \"e\", rhs: BinaryOp(Add(Variable(\"s\"), Scalar(1.0))) }, Return(BinaryOp(Sub(Function { name: Smoothstep, args: [Variable(\"a\"), Variable(\"b\"), Variable(\"c\"), Variable(\"d\"), Variable(\"e\")] }, Scalar(5.0))))])")));
+        assert_eq!(program.map(|e| format!("{e:?}")).parse_peek(&i), expected);
     }
 
     #[test]
     fn quanta() {
         let input = "s=20,[x,z]=r0(x,z),[y,x]=r1(y,x),z+=17,y+=27,i=0,z+=ri(Z(x/s))*70,@xz{$-=nz(x,y,z,.1,i++)*5*i,$i=Z($/s),$=mod($,s)-s/2,}i=ri(xi,zi),j=ri(xi,floor(y/5)),d=i>.1?rU(L(x,z)-1*i-.5*(cos(y/4)+1),bx2(L(x,z)-(cos(floor(y/4))+1)*2,mod(y,4)-2,.1,.2)-.05,1):L(x,mod(y,5)-2.5,z)-G(j,0)*2";
         let i = expand(input);
-        let expected = Ok(("", String::from("Sequence([Assign { var: \"s\", rhs: Scalar(20.0) }, AssignArray { vars: [\"x\", \"z\"], rhs: Function { name: Rot0, args: [Variable(\"x\"), Variable(\"z\")] } }, AssignArray { vars: [\"y\", \"x\"], rhs: Function { name: Rot1, args: [Variable(\"y\"), Variable(\"x\")] } }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), Scalar(17.0))) }, Assign { var: \"y\", rhs: BinaryOp(Add(Variable(\"y\"), Scalar(27.0))) }, Assign { var: \"i\", rhs: Scalar(0.0) }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), Variable(\"ri\"))) }])")));
+        let expected = Ok(("", String::from("Sequence([Assign { var: \"s\", rhs: Scalar(20.0) }, AssignArray { vars: [\"x\", \"z\"], rhs: Function { name: Rot0, args: [Variable(\"x\"), Variable(\"z\")] } }, AssignArray { vars: [\"y\", \"x\"], rhs: Function { name: Rot1, args: [Variable(\"y\"), Variable(\"x\")] } }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), Scalar(17.0))) }, Assign { var: \"y\", rhs: BinaryOp(Add(Variable(\"y\"), Scalar(27.0))) }, Assign { var: \"i\", rhs: Scalar(0.0) }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), BinaryOp(Mul(Function { name: Hash, args: [Function { name: Floors, args: [BinaryOp(Div(Variable(\"x\"), Variable(\"s\")))] }] }, Scalar(70.0))))) }, Assign { var: \"x\", rhs: BinaryOp(Sub(Variable(\"x\"), BinaryOp(Mul(BinaryOp(Mul(Function { name: ValueNoise, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\"), Scalar(0.1), Assign(Inc(\"i\"))] }, Scalar(5.0))), Variable(\"i\"))))) }, Assign { var: \"xi\", rhs: Function { name: Floors, args: [BinaryOp(Div(Variable(\"x\"), Variable(\"s\")))] } }, Assign { var: \"x\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"x\"), Variable(\"s\")] }, BinaryOp(Div(Variable(\"s\"), Scalar(2.0))))) }, Assign { var: \"z\", rhs: BinaryOp(Sub(Variable(\"z\"), BinaryOp(Mul(BinaryOp(Mul(Function { name: ValueNoise, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\"), Scalar(0.1), Assign(Inc(\"i\"))] }, Scalar(5.0))), Variable(\"i\"))))) }, Assign { var: \"zi\", rhs: Function { name: Floors, args: [BinaryOp(Div(Variable(\"z\"), Variable(\"s\")))] } }, Assign { var: \"z\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"z\"), Variable(\"s\")] }, BinaryOp(Div(Variable(\"s\"), Scalar(2.0))))) }, Assign { var: \"i\", rhs: Function { name: Hash, args: [Variable(\"xi\"), Variable(\"zi\")] } }, Assign { var: \"j\", rhs: Function { name: Hash, args: [Variable(\"xi\"), Function { name: Floor, args: [BinaryOp(Div(Variable(\"y\"), Scalar(5.0)))] }] } }, Assign { var: \"d\", rhs: TernaryOp(BinaryOp(Greater(Variable(\"i\"), Scalar(0.1))), Function { name: RoundMin, args: [BinaryOp(Sub(BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), Variable(\"z\")] }, BinaryOp(Mul(Scalar(1.0), Variable(\"i\"))))), BinaryOp(Mul(Scalar(0.5), Paren(BinaryOp(Add(Function { name: Cos, args: [BinaryOp(Div(Variable(\"y\"), Scalar(4.0)))] }, Scalar(1.0)))))))), BinaryOp(Sub(Function { name: Box2, args: [BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), Variable(\"z\")] }, BinaryOp(Mul(Paren(BinaryOp(Add(Function { name: Cos, args: [Function { name: Floor, args: [BinaryOp(Div(Variable(\"y\"), Scalar(4.0)))] }] }, Scalar(1.0)))), Scalar(2.0))))), BinaryOp(Sub(Function { name: Mod, args: [Variable(\"y\"), Scalar(4.0)] }, Scalar(2.0))), Scalar(0.1), Scalar(0.2)] }, Scalar(0.05))), Scalar(1.0)] }, BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), BinaryOp(Sub(Function { name: Mod, args: [Variable(\"y\"), Scalar(5.0)] }, Scalar(2.5))), Variable(\"z\")] }, BinaryOp(Mul(Function { name: Intersect, args: [Variable(\"j\"), Scalar(0.0)] }, Scalar(2.0)))))) }])")));
         assert_eq!(program.map(|e| format!("{e:?}")).parse_peek(&i), expected);
     }
 

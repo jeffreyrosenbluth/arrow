@@ -138,6 +138,29 @@ fn eval_expr(env: &mut Environment, ast: Box<Expr>) -> Value {
             env.insert("#".to_string(), value);
             value
         }
+
+        Expr::Assign(assign) => match assign {
+            AssignExpr::Inc(var) => {
+                let value = env.get(&var).expect("variable not found").clone();
+                let v = match value {
+                    ScalarVal(value) => ScalarVal(value + 1.0),
+                    _ => panic!("inc expects scalar values"),
+                };
+                env.insert(var.clone(), v);
+                env.insert("#".to_string(), v);
+                v
+            }
+            AssignExpr::Dec(var) => {
+                let value = env.get(&var).expect("variable not found").clone();
+                let v = match value {
+                    ScalarVal(value) => ScalarVal(value - 1.0),
+                    _ => panic!("inc expects scalar values"),
+                };
+                env.insert(var.clone(), v);
+                env.insert("#".to_string(), v);
+                v
+            }
+        },
     }
 }
 
@@ -420,7 +443,7 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
             let x = eval_expr(env, Box::new(args[0].clone()));
             let m = eval_expr(env, Box::new(args[1].clone()));
             match (x, m) {
-                (ScalarVal(x), ScalarVal(m)) => ScalarVal(modulo(x, m) - m),
+                (ScalarVal(x), ScalarVal(m)) => ScalarVal(modulo(x, m)),
                 _ => panic!("mod expects scalar values"),
             }
         }
@@ -723,7 +746,6 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 _ => panic!("box3 expects scalar values"),
             }
         }
-        Floors => todo!(),
         Rot0 => {
             let x = eval_expr(env, Box::new(args[0].clone()));
             let y = eval_expr(env, Box::new(args[1].clone()));
@@ -888,7 +910,7 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
         Hash => {
             let x = eval_expr(env, Box::new(args[0].clone()));
             let y = if args.len() > 1 {
-                eval_expr(env, Box::new(args[2].clone()))
+                eval_expr(env, Box::new(args[1].clone()))
             } else {
                 ScalarVal(0.0)
             };

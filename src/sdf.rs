@@ -34,13 +34,17 @@ pub fn sd_round_box(b: Vec3, radius: f32, center: Vec3, transform: Affine3A) -> 
         q.x.max(q.y).max(q.z).min(0.0) + q.max(Vec3::ZERO).length() - radius
     })
 }
+// float sdTorus(vec3 p, float R, float r) {
+//     vec2 q = vec2(length(p.xz) - R, p.y);
+//     return length(q) - r;
+// }
 
-pub fn sd_torus(radius1: f32, radius2: f32, center: Vec3, transform: Affine3A) -> Sdf {
+pub fn sd_torus(major_radius: f32, minor_radius: f32, center: Vec3, transform: Affine3A) -> Sdf {
     Box::new(move |p| {
         let transform = transform.inverse();
         let p = transform.transform_point3(p - center);
-        let q = Vec2::new(p.xz().length() - radius1, p.y);
-        q.length() - radius2
+        let q = Vec2::new(p.xy().length() - major_radius, p.z);
+        q.length() - minor_radius
     })
 }
 

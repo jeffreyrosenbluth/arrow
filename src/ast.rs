@@ -18,6 +18,7 @@ pub enum Expr {
     Function { name: FunctionName, args: Vec<Expr> },
     Variable(String),
     TernaryOp(Box<Expr>, Box<Expr>, Box<Expr>),
+    Assign(AssignExpr),
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -31,6 +32,12 @@ pub enum BinOp {
     GreaterEq(Box<Expr>, Box<Expr>),
     Less(Box<Expr>, Box<Expr>),
     LessEq(Box<Expr>, Box<Expr>),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum AssignExpr {
+    Inc(String),
+    Dec(String),
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -78,7 +85,7 @@ pub enum FunctionName {
     Torus,
     Box2,
     Box3,
-    Floors,
+    // Floors,
     Rot0,
     Rot1,
     Triangle,

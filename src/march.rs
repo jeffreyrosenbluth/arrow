@@ -103,8 +103,7 @@ pub fn render(
     height: u32,
     anti_aliasing: u32,
 ) -> Vec<u8> {
-    let ro = camera_pos;
-    let cam_mat = camera(ro, look_at);
+    let cam_mat = camera(camera_pos, look_at);
     let mut img_data: Vec<u8> = Vec::with_capacity((width * height) as usize);
     for y in 0..height {
         let scanline: Vec<u8> = (0..width)
@@ -122,7 +121,7 @@ pub fn render(
                             0.0,
                         );
                         let rd = cam_mat * v3(uv.x, uv.y, 1.0).normalize();
-                        col += march(sdf, ro, rd, lights, background);
+                        col += march(sdf, camera_pos, rd, lights, background);
                     }
                 }
                 col /= (anti_aliasing * anti_aliasing) as f32;
