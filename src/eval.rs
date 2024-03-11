@@ -9,7 +9,7 @@ pub fn make_sdf(ast: &Statement, a0: f32, a1: f32, p: Vec3) -> f32 {
     let mut env = HashMap::new();
     env.insert("a0".to_string(), Value::ScalarVal(a0));
     env.insert("a1".to_string(), Value::ScalarVal(a1));
-    eval(&mut env, &ast, p);
+    eval(&mut env, ast, p);
     let v = env.get("#").unwrap();
     match v {
         Value::ScalarVal(s) => *s,
@@ -124,7 +124,7 @@ fn eval_expr(env: &mut Environment, ast: Box<Expr>) -> Value {
             r
         }
         Expr::Variable(name) => {
-            let value = env.get(&name).expect("variable not found").clone();
+            let value = *env.get(&name).expect("variable not found");
             env.insert("#".to_string(), value);
             value
         }
@@ -141,7 +141,7 @@ fn eval_expr(env: &mut Environment, ast: Box<Expr>) -> Value {
 
         Expr::Assign(assign) => match assign {
             AssignExpr::Inc(var) => {
-                let value = env.get(&var).expect("variable not found").clone();
+                let value = *env.get(&var).expect("variable not found");
                 let v = match value {
                     ScalarVal(value) => ScalarVal(value + 1.0),
                     _ => panic!("inc expects scalar values"),
@@ -151,7 +151,7 @@ fn eval_expr(env: &mut Environment, ast: Box<Expr>) -> Value {
                 v
             }
             AssignExpr::Dec(var) => {
-                let value = env.get(&var).expect("variable not found").clone();
+                let value = *env.get(&var).expect("variable not found");
                 let v = match value {
                     ScalarVal(value) => ScalarVal(value - 1.0),
                     _ => panic!("inc expects scalar values"),
@@ -237,6 +237,30 @@ fn eval_binop(env: &mut Environment, ast: BinOp) -> Value {
             match (a, b) {
                 (ScalarVal(a), ScalarVal(b)) => ScalarVal(a / b),
                 _ => panic!("/ expects scalar values"),
+            }
+        }
+        BinOp::And(a, b) => {
+            let a = eval_expr(env, a);
+            let b = eval_expr(env, b);
+            match (a, b) {
+                (BoolVal(a), BoolVal(b)) => BoolVal(a && b),
+                _ => panic!("and expects boolean values"),
+            }
+        }
+        BinOp::Or(a, b) => {
+            let a = eval_expr(env, a);
+            let b = eval_expr(env, b);
+            match (a, b) {
+                (BoolVal(a), BoolVal(b)) => BoolVal(a || b),
+                _ => panic!("or expects boolean values"),
+            }
+        }
+        BinOp::Pow(a, b) => {
+            let a = eval_expr(env, a);
+            let b = eval_expr(env, b);
+            match (a, b) {
+                (ScalarVal(a), ScalarVal(b)) => ScalarVal(a.powf(b)),
+                _ => panic!("pow expects scalar values"),
             }
         }
     }
@@ -511,8 +535,14 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
             let arg1 = eval_expr(env, Box::new(args[1].clone()));
             let arg2 = eval_expr(env, Box::new(args[2].clone()));
             let arg3 = eval_expr(env, Box::new(args[3].clone()));
-            let arg4 = eval_expr(env, Box::new(args[4].clone()));
-            let arg5 = eval_expr(env, Box::new(args[5].clone()));
+            let (arg4, arg5) = if args.len() > 4 {
+                (
+                    eval_expr(env, Box::new(args[4].clone())),
+                    eval_expr(env, Box::new(args[5].clone())),
+                )
+            } else {
+                (ScalarVal(0.0), ScalarVal(0.0))
+            };
             match (arg0, arg1, arg2, arg3, arg4, arg5) {
                 (
                     ScalarVal(arg0),
@@ -530,8 +560,14 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
             let arg1 = eval_expr(env, Box::new(args[1].clone()));
             let arg2 = eval_expr(env, Box::new(args[2].clone()));
             let arg3 = eval_expr(env, Box::new(args[3].clone()));
-            let arg4 = eval_expr(env, Box::new(args[4].clone()));
-            let arg5 = eval_expr(env, Box::new(args[5].clone()));
+            let (arg4, arg5) = if args.len() > 4 {
+                (
+                    eval_expr(env, Box::new(args[4].clone())),
+                    eval_expr(env, Box::new(args[5].clone())),
+                )
+            } else {
+                (ScalarVal(0.0), ScalarVal(0.0))
+            };
             match (arg0, arg1, arg2, arg3, arg4, arg5) {
                 (
                     ScalarVal(arg0),
@@ -590,9 +626,39 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 } else {
                     panic!("union expects scalar values")
                 };
-                a.partial_cmp(b).unwrap()
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Less)
             });
-            min.unwrap().clone()
+            *min.unwrap()
+        }
+        RoundMin => {
+            let mut ds: Vec<f32> = args
+                .into_iter()
+                .map(|arg| {
+                    if let ScalarVal(v) = eval_expr(env, Box::new(arg)) {
+                        v
+                    } else {
+                        f32::MAX
+                    }
+                })
+                .collect();
+            let r = ds.pop().unwrap();
+            let d = ds.into_iter().reduce(|a, b| smooth_min(a, b, r));
+            ScalarVal(d.unwrap_or(r))
+        }
+        RoundMax => {
+            let mut ds: Vec<f32> = args
+                .into_iter()
+                .map(|arg| {
+                    if let ScalarVal(v) = eval_expr(env, Box::new(arg)) {
+                        v
+                    } else {
+                        f32::MIN
+                    }
+                })
+                .collect();
+            let r = ds.pop().unwrap();
+            let d = ds.into_iter().reduce(|a, b| smooth_max(a, b, r));
+            ScalarVal(d.unwrap_or(r))
         }
         Intersect => {
             let ds: Vec<Value> = args
@@ -610,9 +676,9 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 } else {
                     panic!("union expects scalar values")
                 };
-                a.partial_cmp(b).unwrap()
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Greater)
             });
-            max.unwrap().clone()
+            *max.unwrap()
         }
         AddMul => {
             let (x, y, z, a, b, c, t) = if args.len() == 4 {
@@ -831,7 +897,6 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 _ => panic!("smoothclamp expects scalar values"),
             }
         }
-        // qcl=(x,p,a,b)=>(qB(x-a,p)-qB(x-b,p)+b+a)/2
         PolySmoothClamp => {
             let x = eval_expr(env, Box::new(args[0].clone()));
             let p = eval_expr(env, Box::new(args[1].clone()));
@@ -843,46 +908,6 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                 }
                 _ => panic!("smoothclamp expects scalar values"),
             }
-        }
-        RoundMax => {
-            let a = eval_expr(env, Box::new(args[0].clone()));
-            let b = eval_expr(env, Box::new(args[1].clone()));
-            let r = eval_expr(env, Box::new(args[2].clone()));
-            match (a, b, r) {
-                (ScalarVal(a), ScalarVal(b), ScalarVal(r)) => ScalarVal(if -a < r && -b < r {
-                    Vec2::new(r + a, r + b).length() - r
-                } else {
-                    a.max(b)
-                }),
-                _ => panic!("roundmax expects scalar values"),
-            }
-        }
-        // RoundMin => {
-        //     let a = eval_expr(env, Box::new(args[0].clone()));
-        //     let b = eval_expr(env, Box::new(args[1].clone()));
-        //     let r = eval_expr(env, Box::new(args[2].clone()));
-        //     match (a, b, r) {
-        //         (ScalarVal(a), ScalarVal(b), ScalarVal(r)) => ScalarVal(smooth_min(a, b, r)),
-        //         _ => panic!("roundmax expects scalar values"),
-        //     }
-        // }
-        RoundMin => {
-            let mut ds: Vec<f32> = args
-                .into_iter()
-                .map(|arg| {
-                    if let ScalarVal(v) = eval_expr(env, Box::new(arg)) {
-                        v
-                    } else {
-                        f32::MAX
-                    }
-                })
-                .collect();
-            let r = ds.pop().unwrap();
-            let m = ds
-                .into_iter()
-                .reduce(|acc, e| smooth_min(acc, e, r))
-                .unwrap();
-            ScalarVal(m)
         }
         ValueNoise => {
             let x = eval_expr(env, Box::new(args[0].clone()));
@@ -936,6 +961,14 @@ fn smooth_min(a: f32, b: f32, r: f32) -> f32 {
         r - Vec2::new(r - a, r - b).length()
     } else {
         a.min(b)
+    }
+}
+
+fn smooth_max(a: f32, b: f32, r: f32) -> f32 {
+    if -a < r && -b < r {
+        r - Vec2::new(r + a, r + b).length()
+    } else {
+        a.max(b)
     }
 }
 

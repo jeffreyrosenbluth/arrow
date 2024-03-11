@@ -81,7 +81,7 @@ fn march(sdf: &Sdf, ro: Vec3, rd: Vec3, lights: &[Light], background: Lum) -> Lu
                 col += light.intensity
                     * phong((light.position - p).normalize(), n, rd)
                     * softshadow(sdf, p, (light.position - p).normalize(), 0.2, 1.0, 4.0)
-                    * ambient_occlusion(&sdf, p, n);
+                    * ambient_occlusion(sdf, p, n);
             });
             return col;
         }

@@ -6,7 +6,8 @@ pub fn expand(input: &str) -> String {
     while let Some(c) = current_char {
         if c == '@' {
             let mut macro_type = String::new();
-            while let Some(c) = in_chars.next() {
+            // while let Some(c) = in_chars.next() {
+            for c in in_chars.by_ref() {
                 if c == '{' {
                     break;
                 }
@@ -14,7 +15,8 @@ pub fn expand(input: &str) -> String {
             }
             let mut content = String::new();
             let mut depth = 1;
-            while let Some(c) = in_chars.next() {
+            // while let Some(c) = in_chars.next() {
+            for c in in_chars.by_ref() {
                 if c == '{' {
                     depth += 1;
                 } else if c == '}' {
@@ -35,17 +37,14 @@ pub fn expand(input: &str) -> String {
     output
 }
 
-fn process_macro(macro_type: &String, content: &String) -> String {
+fn process_macro(macro_type: &str, content: &str) -> String {
     let mut result = String::new();
     if let Ok(repeats) = macro_type.parse::<usize>() {
-        // Number-based macro
-        // let is: Vec<usize> = (1..=repeats).collect();
-        // for i in is.windows(3) {
         for i in 1..=repeats {
             result += &content
                 .replace("$$$", &(i % (repeats + 1)).to_string())
                 .replace("$$", &(i % (repeats + 1)).to_string())
-                .replace("$", &i.to_string());
+                .replace('$', &i.to_string());
         }
     } else {
         // Character-based macro
@@ -54,7 +53,7 @@ fn process_macro(macro_type: &String, content: &String) -> String {
             result += &content
                 .replace("$$$", &cs[(i + 2) % cs.len()].to_string())
                 .replace("$$", &cs[(i + 1) % cs.len()].to_string())
-                .replace("$", &cs[i].to_string());
+                .replace('$', &cs[i].to_string());
         }
     }
     result

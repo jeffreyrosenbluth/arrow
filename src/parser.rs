@@ -53,9 +53,20 @@ fn equal<'a>(i: &mut &'a str) -> PResult<&'a str> {
     delimited(multispaces, "==", multispaces).parse_next(i)
 }
 
+fn and<'a>(i: &mut &'a str) -> PResult<&'a str> {
+    delimited(multispaces, "&&", multispaces).parse_next(i)
+}
+fn or<'a>(i: &mut &'a str) -> PResult<&'a str> {
+    delimited(multispaces, "||", multispaces).parse_next(i)
+}
+
+fn pow<'a>(i: &mut &'a str) -> PResult<&'a str> {
+    delimited(multispaces, "**", multispaces).parse_next(i)
+}
+
 fn program(i: &mut &str) -> PResult<Statement> {
     separated(1.., statement, alt((",", ";")))
-        .map(|stmts| Statement::Sequence(stmts))
+        .map(Statement::Sequence)
         .parse_next(i)
 }
 
@@ -81,7 +92,7 @@ fn statement(i: &mut &str) -> PResult<Statement> {
 }
 
 fn ternary(i: &mut &str) -> PResult<Expr> {
-    let condition = comp.parse_next(i)?;
+    let condition = logic.parse_next(i)?;
     delimited(multispaces, "?", multispaces).parse_next(i)?;
     let if_true = expr.parse_next(i)?;
     delimited(multispaces, ":", multispaces).parse_next(i)?;
@@ -94,21 +105,43 @@ fn ternary(i: &mut &str) -> PResult<Expr> {
 }
 
 fn expr(i: &mut &str) -> PResult<Expr> {
-    delimited(multispaces, alt((ternary, sum)), multispaces).parse_next(i)
+    delimited(multispaces, alt((ternary, logic)), multispaces).parse_next(i)
 }
 
 fn comp(i: &mut &str) -> PResult<Expr> {
     use BinOp::*;
     let lhs = sum.parse_next(i)?;
-    let op = alt((gt, ge, lt, le, equal)).parse_next(i)?;
-    let rhs = sum.parse_next(i)?;
-    match op {
-        "==" => Ok(Expr::BinaryOp(Eq(Box::new(lhs), Box::new(rhs)))),
-        ">=" => Ok(Expr::BinaryOp(GreaterEq(Box::new(lhs), Box::new(rhs)))),
-        "<=" => Ok(Expr::BinaryOp(LessEq(Box::new(lhs), Box::new(rhs)))),
-        ">" => Ok(Expr::BinaryOp(Greater(Box::new(lhs), Box::new(rhs)))),
-        _ => Ok(Expr::BinaryOp(Less(Box::new(lhs), Box::new(rhs)))),
+    let r = opt((alt((gt, ge, lt, le, equal)), sum)).parse_next(i)?;
+    let r = match r {
+        Some(r) => r,
+        None => return Ok(lhs),
+    };
+    match r.0 {
+        "==" => Ok(Expr::BinaryOp(Eq(Box::new(lhs), Box::new(r.1)))),
+        ">=" => Ok(Expr::BinaryOp(GreaterEq(Box::new(lhs), Box::new(r.1)))),
+        "<=" => Ok(Expr::BinaryOp(LessEq(Box::new(lhs), Box::new(r.1)))),
+        ">" => Ok(Expr::BinaryOp(Greater(Box::new(lhs), Box::new(r.1)))),
+        "<" => Ok(Expr::BinaryOp(Less(Box::new(lhs), Box::new(r.1)))),
+        _ => panic!("Unknown operator: {}", r.0),
     }
+}
+
+fn logic(i: &mut &str) -> PResult<Expr> {
+    use BinOp::*;
+    let init = comp.parse_next(i)?;
+
+    repeat(0.., (alt((and, or)), comp))
+        .fold(
+            move || init.clone(),
+            |acc, (op, val): (&str, Expr)| {
+                if op == "&&" {
+                    Expr::BinaryOp(And(Box::new(acc), Box::new(val)))
+                } else {
+                    Expr::BinaryOp(Or(Box::new(acc), Box::new(val)))
+                }
+            },
+        )
+        .parse_next(i)
 }
 
 fn sum(i: &mut &str) -> PResult<Expr> {
@@ -131,9 +164,9 @@ fn sum(i: &mut &str) -> PResult<Expr> {
 
 fn product(i: &mut &str) -> PResult<Expr> {
     use BinOp::*;
-    let init = factor.parse_next(i)?;
+    let init = power.parse_next(i)?;
 
-    repeat(0.., (one_of(['*', '/']), factor))
+    repeat(0.., (one_of(['*', '/']), power))
         .fold(
             move || init.clone(),
             |acc, (op, val): (char, Expr)| {
@@ -145,6 +178,16 @@ fn product(i: &mut &str) -> PResult<Expr> {
             },
         )
         .parse_next(i)
+}
+
+fn power(i: &mut &str) -> PResult<Expr> {
+    use BinOp::*;
+    let lhs = factor.parse_next(i)?;
+    let r = opt((pow, factor)).parse_next(i)?;
+    match r {
+        Some(r) => Ok(Expr::BinaryOp(Pow(Box::new(lhs), Box::new(r.1)))),
+        None => Ok(lhs),
+    }
 }
 
 fn factor(i: &mut &str) -> PResult<Expr> {
@@ -297,7 +340,7 @@ fn identifier(i: &mut &str) -> PResult<String> {
 }
 
 fn variable(i: &mut &str) -> PResult<Expr> {
-    identifier.map(|v| Expr::Variable(v)).parse_next(i)
+    identifier.map(Expr::Variable).parse_next(i)
 }
 
 // rot Infinity map reduce
@@ -356,8 +399,7 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "r1".map(|_| Rot1),
             "rG".map(|_| RoundMax),
             "rmax".map(|_| RoundMax),
-            "rU".map(|_| Union),
-            // "rU".map(|_| RoundMin),
+            "rU".map(|_| RoundMin),
             "rmin".map(|_| RoundMin),
             "acos".map(|_| Acos),
             "asin".map(|_| Asin),
@@ -381,16 +423,16 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
 }
 
 fn list(i: &mut &str) -> PResult<Vec<Expr>> {
-    delimited(lbracket, separated(0.., expr, ","), rbracket).parse_next(i)
+    delimited(lbracket, separated(0.., expr, comma), rbracket).parse_next(i)
 }
 
 fn arg_list(i: &mut &str) -> PResult<Vec<Expr>> {
-    let ls: Vec<Vec<Expr>> = separated(1.., list, ",").parse_next(i)?;
+    let ls: Vec<Vec<Expr>> = separated(1.., list, comma).parse_next(i)?;
     Ok(ls.into_iter().flatten().collect())
 }
 
 fn args(i: &mut &str) -> PResult<Vec<Expr>> {
-    let r = alt((arg_list, separated(0.., expr, ","))).parse_next(i)?;
+    let r = alt((arg_list, separated(0.., expr, comma))).parse_next(i)?;
     let _ = opt(comma).parse_next(i);
     Ok(r)
 }
@@ -413,29 +455,26 @@ mod tests {
     //     }
 
     #[test]
-    fn ts() {
-        // let input = "L(z,y,x)-8,L(x,z,y)-8,L(y,x,z)-8,";
-        let input = "1,y+2,3";
-        // let s: IResult<&str, Vec<&str>> = separated(0.., "a", ",").parse_peek(input);
-        let s = args.parse_peek(input);
-        let _ = dbg!(s);
-    }
-
-    #[test]
     fn tt() {
         // let input = "s=1;@5{@xyz{$=B($*2)-8,}s*=.5,}(L(x,y,z)-8)*s";
         // let input = "s=2.5,h=s/2,d=(s+h)/2,q=20,y-=10,[x,y]=r0(x,y),@xyz{$/=q,}c=1,t=0,@7{@xyz{$=mod($-h,s)-h,}t=d/D([x,y,z],[x,y,z]),@xyzc{$*=t,}}d=L(x,y,z)/c*2.-.025";
         // let input =  "[x,z]=r0(x,z), x+=11, z+=15, y+=10, h=exp(-1.5*B(nz(x,0,z,.1,1))), g=y-10*h-nz(x,0,z,10,1)*0.05, b = y-12, a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8,),1.5 )-nz(x,0,z,12,1)*0.15, s=(L(x>7?(mod(x,4)-2)/2:x,x<1?y:b/3+2,B(z)-1.5)-1.8)-nz(x,y,z,.5,1)*2, rG(U(a,g),-s,1)";
         // let input = "a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8,),1.5 )-nz(x,0,z,12,1)*0.15", rG(U(a,g),-s,1)";
-        let input = "x>7?(mod(x,4)-2)/2:x";
+        // let input = "x>7?(mod(x,4)-2)/2:x";
+        // let input = "@xyz{$m=mod($,20)-10,$i=Z($/20),}d=99,g=.05,y-=20,[z,x]=r0(z,x),n=nz(x,y,z,.1,1),n1=nz(x,y,z,.3,2,3),@4{x-=20,o=$*200+20,e=B(y+n1/2+sin(z*.05+o)*10)-1,e=rG(e,B(z+sin(x*.05+o)*25)-5+n1*2,.2),@xz{$1=mod($+n*10,3)-1.5,}e=rG(e,-(B(z1)-g),.25),e=rG(e,-(B(x1)-g),.25),d=U(d,e),[x,z]=r1(z,x),y+=20,}U(d,ri(xi,yi,zi)>.4&&L(xi,yi,zi)>3?L(xm,ym,zm)-2:10)";
+        // let input = "U(d,ri(xi,yi,zi)>.4&&L(xi,yi,zi)>3?L(xm,ym,zm)-2:10)";
+        // let input = "ri(xi,yi,zi)>.4&&L(xi,yi,zi)>3?L(xm,ym,zm)-2:10";
+        // let input = "a = (x > 7)"; // && (y < 10)";
         // let input = "b=0; a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8),1.5 )";
         // let input = "s=.5,y+=6, a=k(y+22,B(z+10*g(x*.005+.2))-16)-4,b=TR(x/40+.2)*40,c; [b,y]=r1(b,y), [y,z]=r0(y,z+15), r=rU(U(@byz{bx2(B($$$)-20,bx2($,$$,23)+3,3)-.4,}),a,3)"; //, @4{ [x,y]=r1(x,y), [y,z]=r0(y,z), a=nz(x,y,z,.02/s,$+5), a=B(a)*50-3, r=rU(r,rG(r-7*s,a*s,s*2),s*2), s*=.5, } r";
         // let input = "a=rU(1,2,3,4,5,6)";
         // let input = "k(y+22, 2)";
         // let input = "U(@xyz{L($$$,$$,$)-8,})";
         // let input = "i=0, sin(i++)";
+        // let input = "a = sin(x) > cos(x) && sin(y) < cos(y)";
+        // let input = "ri(x,y,z)>.4&&L(x,y,z)>3?L(x,y,z)-2:10";
+        let input = "@xyz{$m=mod($,20)-10,$i=Z($/20),}d=99,g=.05,y-=20,[z,x]=r0(z,x),n=nz(x,y,z,.1,1),n1=nz(x,y,z,.3,2,3),@4{x-=20,o=$*200+20,e=B(y+n1/2+sin(z*.05+o)*10)-1,e=rG(e,B(z+sin(x*.05+o)*25)-5+n1*2,.2),@xz{$1=mod($+n*10,3)-1.5,}e=rG(e,-(B(z1)-g),.25),e=rG(e,-(B(x1)-g),.25),d=U(d,e),[x,z]=r1(z,x),y+=20,}U(d,ri(xi,yi,zi)>.4&&L(xi,yi,zi)>3?L(xm,ym,zm)-2:10)";
         let i = &expand(input);
-        // let input = "U(L(z,y,x)-8,L(x,z,y)-8,L(y,x,z)-8)";
         let _ = dbg!(program.parse_peek(i));
     }
     #[test]
@@ -474,7 +513,7 @@ mod tests {
     fn quanta() {
         let input = "s=20,[x,z]=r0(x,z),[y,x]=r1(y,x),z+=17,y+=27,i=0,z+=ri(Z(x/s))*70,@xz{$-=nz(x,y,z,.1,i++)*5*i,$i=Z($/s),$=mod($,s)-s/2,}i=ri(xi,zi),j=ri(xi,floor(y/5)),d=i>.1?rU(L(x,z)-1*i-.5*(cos(y/4)+1),bx2(L(x,z)-(cos(floor(y/4))+1)*2,mod(y,4)-2,.1,.2)-.05,1):L(x,mod(y,5)-2.5,z)-G(j,0)*2";
         let i = expand(input);
-        let expected = Ok(("", String::from("Sequence([Assign { var: \"s\", rhs: Scalar(20.0) }, AssignArray { vars: [\"x\", \"z\"], rhs: Function { name: Rot0, args: [Variable(\"x\"), Variable(\"z\")] } }, AssignArray { vars: [\"y\", \"x\"], rhs: Function { name: Rot1, args: [Variable(\"y\"), Variable(\"x\")] } }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), Scalar(17.0))) }, Assign { var: \"y\", rhs: BinaryOp(Add(Variable(\"y\"), Scalar(27.0))) }, Assign { var: \"i\", rhs: Scalar(0.0) }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), BinaryOp(Mul(Function { name: Hash, args: [Function { name: Floors, args: [BinaryOp(Div(Variable(\"x\"), Variable(\"s\")))] }] }, Scalar(70.0))))) }, Assign { var: \"x\", rhs: BinaryOp(Sub(Variable(\"x\"), BinaryOp(Mul(BinaryOp(Mul(Function { name: ValueNoise, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\"), Scalar(0.1), Assign(Inc(\"i\"))] }, Scalar(5.0))), Variable(\"i\"))))) }, Assign { var: \"xi\", rhs: Function { name: Floors, args: [BinaryOp(Div(Variable(\"x\"), Variable(\"s\")))] } }, Assign { var: \"x\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"x\"), Variable(\"s\")] }, BinaryOp(Div(Variable(\"s\"), Scalar(2.0))))) }, Assign { var: \"z\", rhs: BinaryOp(Sub(Variable(\"z\"), BinaryOp(Mul(BinaryOp(Mul(Function { name: ValueNoise, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\"), Scalar(0.1), Assign(Inc(\"i\"))] }, Scalar(5.0))), Variable(\"i\"))))) }, Assign { var: \"zi\", rhs: Function { name: Floors, args: [BinaryOp(Div(Variable(\"z\"), Variable(\"s\")))] } }, Assign { var: \"z\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"z\"), Variable(\"s\")] }, BinaryOp(Div(Variable(\"s\"), Scalar(2.0))))) }, Assign { var: \"i\", rhs: Function { name: Hash, args: [Variable(\"xi\"), Variable(\"zi\")] } }, Assign { var: \"j\", rhs: Function { name: Hash, args: [Variable(\"xi\"), Function { name: Floor, args: [BinaryOp(Div(Variable(\"y\"), Scalar(5.0)))] }] } }, Assign { var: \"d\", rhs: TernaryOp(BinaryOp(Greater(Variable(\"i\"), Scalar(0.1))), Function { name: RoundMin, args: [BinaryOp(Sub(BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), Variable(\"z\")] }, BinaryOp(Mul(Scalar(1.0), Variable(\"i\"))))), BinaryOp(Mul(Scalar(0.5), Paren(BinaryOp(Add(Function { name: Cos, args: [BinaryOp(Div(Variable(\"y\"), Scalar(4.0)))] }, Scalar(1.0)))))))), BinaryOp(Sub(Function { name: Box2, args: [BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), Variable(\"z\")] }, BinaryOp(Mul(Paren(BinaryOp(Add(Function { name: Cos, args: [Function { name: Floor, args: [BinaryOp(Div(Variable(\"y\"), Scalar(4.0)))] }] }, Scalar(1.0)))), Scalar(2.0))))), BinaryOp(Sub(Function { name: Mod, args: [Variable(\"y\"), Scalar(4.0)] }, Scalar(2.0))), Scalar(0.1), Scalar(0.2)] }, Scalar(0.05))), Scalar(1.0)] }, BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), BinaryOp(Sub(Function { name: Mod, args: [Variable(\"y\"), Scalar(5.0)] }, Scalar(2.5))), Variable(\"z\")] }, BinaryOp(Mul(Function { name: Intersect, args: [Variable(\"j\"), Scalar(0.0)] }, Scalar(2.0)))))) }])")));
+        let expected = Ok(("", String::from("Sequence([Assign { var: \"s\", rhs: Scalar(20.0) }, AssignArray { vars: [\"x\", \"z\"], rhs: Function { name: Rot0, args: [Variable(\"x\"), Variable(\"z\")] } }, AssignArray { vars: [\"y\", \"x\"], rhs: Function { name: Rot1, args: [Variable(\"y\"), Variable(\"x\")] } }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), Scalar(17.0))) }, Assign { var: \"y\", rhs: BinaryOp(Add(Variable(\"y\"), Scalar(27.0))) }, Assign { var: \"i\", rhs: Scalar(0.0) }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), BinaryOp(Mul(Function { name: Hash, args: [Function { name: Floor, args: [BinaryOp(Div(Variable(\"x\"), Variable(\"s\")))] }] }, Scalar(70.0))))) }, Assign { var: \"x\", rhs: BinaryOp(Sub(Variable(\"x\"), BinaryOp(Mul(BinaryOp(Mul(Function { name: ValueNoise, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\"), Scalar(0.1), Assign(Inc(\"i\"))] }, Scalar(5.0))), Variable(\"i\"))))) }, Assign { var: \"xi\", rhs: Function { name: Floor, args: [BinaryOp(Div(Variable(\"x\"), Variable(\"s\")))] } }, Assign { var: \"x\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"x\"), Variable(\"s\")] }, BinaryOp(Div(Variable(\"s\"), Scalar(2.0))))) }, Assign { var: \"z\", rhs: BinaryOp(Sub(Variable(\"z\"), BinaryOp(Mul(BinaryOp(Mul(Function { name: ValueNoise, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\"), Scalar(0.1), Assign(Inc(\"i\"))] }, Scalar(5.0))), Variable(\"i\"))))) }, Assign { var: \"zi\", rhs: Function { name: Floor, args: [BinaryOp(Div(Variable(\"z\"), Variable(\"s\")))] } }, Assign { var: \"z\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"z\"), Variable(\"s\")] }, BinaryOp(Div(Variable(\"s\"), Scalar(2.0))))) }, Assign { var: \"i\", rhs: Function { name: Hash, args: [Variable(\"xi\"), Variable(\"zi\")] } }, Assign { var: \"j\", rhs: Function { name: Hash, args: [Variable(\"xi\"), Function { name: Floor, args: [BinaryOp(Div(Variable(\"y\"), Scalar(5.0)))] }] } }, Assign { var: \"d\", rhs: TernaryOp(BinaryOp(Greater(Variable(\"i\"), Scalar(0.1))), Function { name: Union, args: [BinaryOp(Sub(BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), Variable(\"z\")] }, BinaryOp(Mul(Scalar(1.0), Variable(\"i\"))))), BinaryOp(Mul(Scalar(0.5), Paren(BinaryOp(Add(Function { name: Cos, args: [BinaryOp(Div(Variable(\"y\"), Scalar(4.0)))] }, Scalar(1.0)))))))), BinaryOp(Sub(Function { name: Box2, args: [BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), Variable(\"z\")] }, BinaryOp(Mul(Paren(BinaryOp(Add(Function { name: Cos, args: [Function { name: Floor, args: [BinaryOp(Div(Variable(\"y\"), Scalar(4.0)))] }] }, Scalar(1.0)))), Scalar(2.0))))), BinaryOp(Sub(Function { name: Mod, args: [Variable(\"y\"), Scalar(4.0)] }, Scalar(2.0))), Scalar(0.1), Scalar(0.2)] }, Scalar(0.05))), Scalar(1.0)] }, BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), BinaryOp(Sub(Function { name: Mod, args: [Variable(\"y\"), Scalar(5.0)] }, Scalar(2.5))), Variable(\"z\")] }, BinaryOp(Mul(Function { name: Intersect, args: [Variable(\"j\"), Scalar(0.0)] }, Scalar(2.0)))))) }])")));
         assert_eq!(program.map(|e| format!("{e:?}")).parse_peek(&i), expected);
     }
 

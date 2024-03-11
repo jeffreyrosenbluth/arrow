@@ -32,6 +32,9 @@ pub enum BinOp {
     GreaterEq(Box<Expr>, Box<Expr>),
     Less(Box<Expr>, Box<Expr>),
     LessEq(Box<Expr>, Box<Expr>),
+    And(Box<Expr>, Box<Expr>),
+    Or(Box<Expr>, Box<Expr>),
+    Pow(Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug, Clone, Serialize)]

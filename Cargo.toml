@@ -13,4 +13,4 @@ rayon = "1.8.0"
 serde_json = "1.0.112"
 serde = { version = "1.0.196", features = ["derive"] }
 # winnow = {version ="0.5.39", features = ["debug"]}
-winnow = "0.5.39"
+winnow = "0.6.5"
