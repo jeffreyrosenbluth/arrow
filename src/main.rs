@@ -1,175 +1,169 @@
-use std::vec;
+use std::collections::HashMap;
 
 use arrow::core::*;
+use arrow::eval::*;
 use arrow::march::render;
-use arrow::sdf::*;
-use glam::{Affine2, Affine3A, Vec2, Vec3, Vec3Swizzles};
 
-const WIDTH: u32 = 1024;
-const HEIGHT: u32 = 1024;
+#[allow(unused_imports)]
+use arrow::sdf::sd_plane;
+use glam::Vec3;
 
-fn modulus(a: f32, b: f32) -> f32 {
-    ((a % b) + b) % b
-}
-
-fn gold(_: Vec3) -> Material {
-    Material::color(Vec3::new(0.7, 0.6, 0.0), 5.0)
-}
-
-fn rust(_: Vec3) -> Material {
-    Material::color(Vec3::new(0.7, 0.2, 0.0), 10.0)
-}
-
-fn red(_: Vec3) -> Material {
-    Material::color(Vec3::new(1.0, 0.0, 0.1), 50.0)
-}
-
-fn teal(_: Vec3) -> Material {
-    Material::color(Vec3::new(0.2, 0.4, 0.4), 1.0)
-}
-
-fn green(_: Vec3) -> Material {
-    Material::color(Vec3::new(0.4, 0.7, 0.1), 50.0)
-}
-
-fn magenta(_: Vec3) -> Material {
-    Material::color(Vec3::new(0.5, 0.0, 0.5), 20.0)
-}
-
-fn slate(_: Vec3) -> Material {
-    Material::color(Vec3::new(0.25, 0.35, 0.35), 10.0)
-}
-
-fn checkerboard(p: Vec3) -> Material {
-    Material {
-        ambient: v3(modulus(1.0 + 0.7 * (p.x.floor() + p.z.floor()), 2.0) * 0.3),
-        diffuse: v3(0.3),
-        specular: Vec3::ZERO,
-        shininess: 1.0,
-    }
-}
-
-fn displacement(p: Vec3) -> f32 {
-    let freq = 10.0;
-    (p.x * freq).sin() * (p.y * freq).sin() * (p.z * freq).sin() * 0.1
-}
-
-#[allow(dead_code)]
-fn scene0() -> Sdf {
-    let sphere_gold = perturb(
-        sd_sphere(1.0, Vec3::new(-1.0, 0.0, 0.0), I, gold),
-        displacement,
-    );
-    let sphere_red = sd_sphere(0.75, Vec3::new(1.0, 0.0, 0.0), I, rust);
-    let floor = sd_plane(Vec3::new(0.05, 1.0, 0.0), I, checkerboard);
-    // let floor = Box::new(move |p: Vec3| Surface::new(p.y + 1.0, checkerboard));
-
-    let mut tr = Affine3A::from_rotation_y(-0.4);
-    tr = tr * Affine3A::from_rotation_x(0.35);
-    let cube = sd_round_box(v3(0.6), 0.05, Vec3::new(1.0, 0.0, 0.0), tr, teal);
-
-    let tr = Affine3A::from_rotation_x(0.5);
-    let torus = sd_torus(0.6, 0.2, Vec3::new(0.1, 0.0, -0.2), tr, red);
-
-    let capsule = sd_capsule(
-        0.25,
-        Vec3::new(-0.5, 1.9, 0.1),
-        Vec3::new(-1.0, 0.0, 0.0),
-        Vec3::new(1.0, 0.0, 0.0),
-        I,
-        slate,
-    );
-
-    let rounded_cube = round(
-        sd_box(
-            Vec3::new(0.4, 0.3, 0.0),
-            Vec3::new(-1.9, 1.9, 0.0),
-            I,
-            green,
-        ),
-        0.2,
-    );
-
-    let mut balls = Vec::new();
-    for i in 0..10 {
-        balls.push(sd_sphere(
-            0.07,
-            Vec3::new(-0.9 + i as f32 * 0.2, -0.9, -1.5),
-            I,
-            magenta,
-        ));
-    }
-
-    let frame = difference(cube, sphere_red);
-
-    let cylinder = sd_cylinder(
-        0.1,
-        Vec3::new(0.0, 0.0, 0.0),
-        Vec3::new(1.75, -0.5, -1.0),
-        Vec3::new(1.25, 0.5, -1.5),
-        I,
-        rust,
-    );
-
-    let a = unions(vec![
-        sphere_gold,
-        floor,
-        torus,
-        capsule,
-        frame,
-        rounded_cube,
-        cylinder,
-    ]);
-    let b = unions(balls);
-    union(a, b)
-}
-
-#[allow(dead_code)]
-fn scene1() -> Sdf {
-    let plane = sd_plane(Vec3::new(0.05, 1.0, 0.0), I, slate);
-    union(plane, sd_sphere(1.0, Vec3::new(0.0, 0.0, 0.0), I, gold))
-}
-
-// Not working yet, needs to implement the shade function: https://www.shadertoy.com/view/XcS3zK
-#[allow(dead_code)]
-fn scene2(t: f32) -> Sdf {
-    fn rot(a: f32) -> Affine2 {
-        Affine2::from_angle(a)
-    }
-    fn g(p: Vec3) -> f32 {
-        let s = Vec3::new(p.y.sin(), p.z.sin(), p.x.sin());
-        let c = Vec3::new(p.z.cos(), p.x.cos(), p.y.cos());
-        c.dot(s)
-    }
-    Box::new(move |p| {
-        let mut q = p;
-        let xz = rot(t).transform_point2(q.xz());
-        q.x = xz.x;
-        q.z = xz.y;
-        let xy = rot(0.3).transform_point2(q.xy());
-        q.x = xy.x - 0.5;
-        q.y = xy.y - 0.5;
-        let mut d = (-(Vec2::new(q.y, q.xz().length() - 2.0)).length() - 1.8 + t.cos() * 0.3).abs();
-        let h = g(p.yxz() * 4.0) / 4.0;
-        d = Vec2::new(d, h).length() - 0.3;
-        let c = Material::color(v3(h), 1.0);
-        Surface::new(d, c)
-    })
-}
+const S: u32 = 1;
+const WIDTH: u32 = 1024 / S;
+const HEIGHT: u32 = 768 / S;
 
 fn main() {
-    let background = Vec3::new(0.0, 0.0, 0.2);
+    use arrow::parser::*;
+    let background = 0.75;
+    let examples = examples();
+    let (mut input, pos) = *examples.get("sprenkle").unwrap();
+    let ast = parse(&mut input);
+    dbg!(&ast);
+    let sdf: Sdf = Box::new(move |p| make_sdf(&ast, 0.1, 0.2, p));
+    println!("sdf: {}", sdf(v3(0.0, 0.0, -50.0)));
+    // let plane = sd_plane(v3(0.0, 0.85, 0.3), 10.0, I);
+    // let sdf = union(sdf, plane);
     let img_data = render(
-        &scene0(),
-        3.25,
+        &sdf,
+        // Camera position
+        pos,
+        // Look at
+        ZERO3,
         &vec![
-            Light::new(Vec3::new(-4.0, 6.0, -6.0), 0.8),
-            Light::new(Vec3::new(0.0, 0.0, -6.0), 0.2),
+            Light::new(v3(0.0, 0.0, -26.0), 1.0),
+            // Light::new(v3(0.0, 30.0, -40.0), 1.0),
         ],
         background,
         WIDTH,
         HEIGHT,
-        2,
+        2, // Anti-aliasing
     );
-    image::save_buffer("out.png", &img_data, WIDTH, HEIGHT, image::ColorType::Rgb8).unwrap();
+    image::save_buffer("hatch.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
+}
+
+fn examples<'a>() -> HashMap<&'a str, (&'a str, Vec3)> {
+    let pos = v3(0.0, 0.0, -20.0);
+    let mut examples = HashMap::new();
+    examples.insert("sphere", ("b=B(y-12)-6; L(x,b,z)-6", v3(0.0, 0.0, -20.0)));
+    examples.insert(
+        "balls8a",
+        ("@xyz{$=B($)-6,} L(x,y,z)-5", v3(10.0, 20.0, -25.0)),
+    );
+    examples.insert(
+        "cubes8a",
+        (
+            "rU(bx3(x,y,z, 5), bx3(x-8, y+5,z,5), bx3(x+8,y-5,z,5), 5)",
+            v3(10.0, 20.0, -25.0),
+        ),
+    );
+    examples.insert(
+        "box_of_balls",
+        (
+            "s=1; @5{ [x,y]=r0(x,y), [x,z]=r1(x,z), @xyz{$=B($*2)-8,} s*=.5; } (L(x,y,z)-8)*s",
+            v3(0.0, 0.0, -20.0),
+        ),
+    );
+    examples.insert(
+        "sponge", 
+        ("r=bx3(x,y,z,9),s=1; @3{ @xyz{$=(mod($+9,18)-9)*3,} s/=3, r=k(r,-U(@xyz{bx2($,$$,9),})*s), }r", v3(-20.0, 20.0, -5.0))
+    );
+    examples.insert("donut", ("don(x,y-2,z,15,2)", v3(0.0, 0.0, -20.0)));
+    examples.insert(
+        "donuts",
+        ("don(x,y-3,mod(z,8)-4,8,1)", (v3(-50.0, 20.0, -20.0))),
+    );
+    examples.insert("rods", ("L(B(B(x)-3)-3,B(y)-3)-2", pos));
+    examples.insert(
+        "rounded_box",
+        ("bx3(x,y,z,7,4,4)-5", v3(-20.0, 20.0, -20.0)),
+    );
+    examples.insert("elbow", ("L(k(x,y-10),z)-5", pos));
+    examples.insert("fence", ("L(x,TR(y))-.5", v3(10.0, 10.0, -50.0)));
+    examples.insert(
+        "cross",
+        (
+            "U( bx3(mod(x,4)-2,y,z,6), bx3(x,y,mod(x,4)-2,6), L(TR(x),y)-1, L(x+20,y-20,z-20)-8)",
+            v3(-10.0, 20.0, -10.0),
+        ),
+    );
+    examples.insert(
+        "apollonius",
+        (
+            "s=2.5,h=s/2,d=(s+h)/2,q=20,y-=10,[x,y]=r0(x,y),@xyz{$/=q,}c=1,t=0,@7{@xyz{$=mod($-h,s)-h,}t=d/D([x,y,z],[x,y,z]),@xyzc{$*=t,}}d=L(x,y,z)/c*2.-.025", 
+            v3(0.0, 0.0, -30.0)
+        ),
+    );
+    examples.insert("rot_cube", ("[a,b]=r0(x,y-9); bx3(a,b,z,4)-.5", pos));
+    examples.insert(
+        "hyperplane",
+        ("a=(2*x-3*z+6*y)/7,b=(7*x-2*z+26*y)/27,c=(6*z-3*x+22*y)/23,d=0,zz=0;[x,z]=r1(x,z+8),[x,y]=r0(x,y),y-=3,zz=FR(z/26-.55)*26-13,d=SM(9,-12,y+3-z*.3),U(k(k(k(bx3(x,y-5,zz,7,14,7)-1,@abc{d-B(TR($))),}L(x+99,y+445,z+32)-434)", pos),
+    );
+    examples.insert(
+        "desire",
+        ("[x,y]=r0(x,y-1), [x,z]=r1(x,z), yb=B(y)-22.5, U(rG(32-k(0-y-13,z-15),TR(x*.25)*4-2+4*SM(0,16,x),4),rG( B(B(L(L(x,z)-16,yb-cl(yb,-8.5,8.5))-8)-4)-2, B(B(L(B(x)-15,B(B(y)-15)-15,B(z)-15)-9)-4)-2,1 ))", pos),
+    );
+    examples.insert(
+        "singularity",
+        ("[x,z]=r0(x,z),l=L(x,y,z),n=2.0 * nz(atan2(z,x),Math.acos(y/l),l,.3,0,1),d=l-20+n*5,d=B(d)-5,d=B(d)-1,b=99,@4{b=U(b,bx2(x,y-n*3+10-$*10,100,2+$*.5)),}rU(y+20-B(n)*.2,k(0-b,d)-.4,20)", pos),
+    );
+    examples.insert(
+        "gnarl",
+        ("p=B(y-18)-13,n=nz(x,y,z,.2,0,2)*2,q=mod(p,12+n*z)-1.8", pos),
+    );
+    examples.insert(
+        "ondu",
+        ("s=.5,y+=6, a=k(y+22,B(z+10*g(x*.005+.2))-16)-4,b=TR(x/40+.2)*40,c; [b,y]=r1(b,y), [y,z]=r0(y,z+15), r=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8),1.5 )-nz(x,0,z,12,1)*0.15, s=(L(x>7?(mod(x,4)-2)/2:x,x<1?y:b/3+2,B(z)-1.5)-1.8)-nz(x,y,z,.5,1)*2, rG(U(a,g),-s,1)", pos),
+    );
+    examples.insert(
+        "source",
+        ("@zy{$f=$+nz(x,y,z,.03,1)*40,} zf+=nz(x,y,z,.1,2)*20, f=L(zf+10,yf)-20, w=y+nz(x,y,z+30,.4,2,1)*2.2+1, g=y+nz(x,y,z,0.1,1), p=min(max(g,-f),max(w,f))+nz(x,y,z,.02,2,2)*4, [ex,ey]=r0(x-18,y-6), [ey,ez]=r1(ey,z-11), es=2, e=bx3(ex,ey,ez,es*1.5,es,.1), sg=.5, @xyz{$g=e$+nz(ex/1.6,ey,ez,1,1,2)*2,} g=1e6, @xy{g=U(g,L(ez-.1,mod($g, sg)-sg/2)-sg*.07),} g=max(g,bx3(ex,ey,ez,es*1.5*.85,es*.85,2)), min(p, e, g, bx3(ex+3,B(ey)-.8,ez, 4,.1,.1), bx3(ex+3,ey,ez, .05, es*1.2,.5),bx3(ex-3,ey,ez, .05, es*.2,.2))", pos),
+    );
+    examples.insert(
+        "spheres",
+        ("y-=5,z-=3, r=L(x,y,z), ph=atan2(y,x), th=Math.acos(z/r), n=18,r0=r-33, cs=sin(n*ph)*cos(n*th), c0=L(r0,cs)-.1, c3=L(r0-cl(r0,-2,-1),r/n*(cs-.5))-.05, c4=L(r0-cl(r0,-1,.5),r/n*(cs-.75))-.05, c5=L(r0-cl(r0,-1,1),r/n*(cs-.95))-.025, n=4,r1=1.25*n*sin(th), x=r0, y=r/n*sin(th)*cos(n*ph)*sin(n*th), z=r/n*sin(th)*sin(n*ph)*cos(n*th), c1=L(x,y,z)-r1, r=L(x,y,z), ph=atan2(y,x), th=Math.acos(z/r), zr=r-r1-cl(r-r1,0,.5), n=12, x=r/n*(sin(th)*cos(n*ph)*sin(n*th)-.5), c2=L(x,zr)-.05, U(c0,c1,c2,c3,c4,c5)", pos),
+    );
+    examples.insert(
+        "arctic",
+        ("[x,z]=r0(x,z), x+=11, z+=15, y+=10, h=exp(-1.5*B(nz(x,0,z,.1,1))), g=y-10*h-nz(x,0,z,10,1)*0.05, b = y-12, a=rU( L(x-cl(x,-2,2),b*1.3,z)-3, U( L(x+5,b-1,z)-1.7, L(x+5,b-2,B(z)-1.5)-0.8, bx3(x-5,b-1,z,0.2,0.1,0.2)-0.5, bx3(x+5,b-1,z,1.9,.1,.1)-.5, L(B(x)-3.5,b-cl(b,-4,0),B(z)-1.5)-.8),1.5 )-nz(x,0,z,12,1)*0.15, s=(L(x>7?(mod(x,4)-2)/2:x,x<1?y:b/3+2,B(z)-1.5)-1.8)-nz(x,y,z,.5,1)*2, rG(U(a,g),-s,1)", pos),
+    );
+    examples.insert(
+        "quanta",
+        ("s=20,[x,z]=r0(x,z),[y,x]=r1(y,x),z+=17,y+=27,i=0,z+=ri(Z(x/s))*70,@xz{$-=nz(x,y,z,.1,i++)*5*i,$i=Z($/s),$=mod($,s)-s/2,}i=ri(xi,zi),j=ri(xi,floor(y/5)),d=i>.1?rU(L(x,z)-1*i-.5*(cos(y/4)+1),bx2(L(x,z)-(cos(floor(y/4))+1)*2,mod(y,4)-2,.1,.2)-.05,1):L(x,mod(y,5)-2.5,z)-G(j,0)*2", pos),
+    );
+    examples.insert(
+        "thepath",
+        (
+            "@xyz{$m=mod($,20)-10,$i=Z($/20),}d=99,g=.05,y-=20,[z,x]=r0(z,x),n=nz(x,y,z,.1,1),n1=nz(x,y,z,.3,2,3),@4{x-=20,o=$*200+20,e=B(y+n1/2+sin(z*.05+o)*10)-1,e=rG(e,B(z+sin(x*.05+o)*25)-5+n1*2,.2),@xz{$1=mod($+n*10,3)-1.5,}e=rG(e,-(B(z1)-g),.25),e=rG(e,-(B(x1)-g),.25),d=U(d,e),[x,z]=r1(z,x),y+=20,}U(d,ri(xi,yi,zi)>.4&&L(xi,yi,zi)>3?L(xm,ym,zm)-2:10)",
+             v3(10.0, 20.0, -25.0)
+            )
+    );
+    examples.insert(
+        "mycelia",
+        (
+            "@xyz{$/=20,} xm=.9,ym=.3,zm=.7, @4{ @xyz{$=B($)-$m,} s=1/scl(L(x,y,z)**3,.1,.1,1), @xyz{$=$*s-$$m,} } L(z,y)-.1",
+            v3(10.0, 10.0, -15.0),
+        )
+    );
+    examples.insert(
+        "pawns", 
+        (
+            "i=mod(floor(x/8)+floor(z/8),2),x=mod(x,8)-4,z=mod(z,8)-4,a=L(x,y,z)-1,q=L(x,z),b=max(D([1,.3],[q,y]),-5-y),a=rU(a,b,1),y+=1,a=rU(a,L(x,y*5,z)-.8,1),y+=3,a=rU(a,L(x,y*2,z)-1,.5),y+=1,a=rU(a,L(x,y*3,z)-1.7,0.1),min(a,y+.5*i*nz(x,y,z,8,0)))",
+            v3(0.0, 0.0, -20.0)
+        )
+    );
+    examples.insert(
+        "plato",
+        (
+            "d=99,l=10, x-=l*2, y-=l,z+=2.5, @3{ x+=l, a=a0*($+2),s=sin(a),c=cos(a), [x1,y1]=rot(x,y,s,c), a=a1*($+2),s=sin(a),c=cos(a), [x1,z1]=rot(x1,z,s,c), d=rU(d, bx3(x1,y1,z1,4),3), } U(d+.5, L(nz(x,y,z,.1,1,2)-.5, abs(d)-.1)-.4)",
+            v3(0.0, 30.0, -10.0)
+        )
+    );
+    examples.insert(
+        "sprenkle",
+        (
+            "y+=7, rU( don(x,y-12,mod(z,8)-4,7+3*SM(9,15,y)+4*nz(x,y,z,.3,1),2.7-2*SM(9,15,y)+nz(x,y,z,.2,2)), L(x,y+83)-90,1)-.1*SM(0,.15,B(nz(x,y,z,2,0,3)))",
+            v3(0.0, 0.0, -40.0)
+        )
+    );
+    examples
 }
