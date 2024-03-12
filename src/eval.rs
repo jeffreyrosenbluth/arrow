@@ -1,6 +1,7 @@
 use crate::ast::*;
 use crate::core::{fbm, hash, modulo, v3, I, ZERO3};
 use crate::sdf::{sd_box, sd_torus};
+use core::panic;
 use glam::{Mat2, Vec2, Vec3};
 use std::collections::HashMap;
 use std::f32::consts::TAU;
@@ -838,6 +839,18 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                     Vec2Val(m * v)
                 }
                 _ => panic!("rot1 expects scalar values"),
+            }
+        }
+        Rot => {
+            let x = eval_expr(env, Box::new(args[0].clone()));
+            let y = eval_expr(env, Box::new(args[1].clone()));
+            let c = eval_expr(env, Box::new(args[2].clone()));
+            let s = eval_expr(env, Box::new(args[3].clone()));
+            match (x, y, c, s) {
+                (ScalarVal(x), ScalarVal(y), ScalarVal(c), ScalarVal(s)) => {
+                    Vec2Val(Vec2::new(c * x + s * y, c * y - s * x))
+                }
+                _ => panic!("rot expects scalar values"),
             }
         }
         Triangle => {

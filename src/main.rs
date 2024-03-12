@@ -16,7 +16,7 @@ fn main() {
     use arrow::parser::*;
     let background = 0.75;
     let examples = examples();
-    let (mut input, pos) = *examples.get("cubes8a").unwrap();
+    let (mut input, pos) = *examples.get("sprenkle").unwrap();
     let ast = parse(&mut input);
     dbg!(&ast);
     let sdf: Sdf = Box::new(move |p| make_sdf(&ast, 0.1, 0.2, p));
@@ -36,7 +36,7 @@ fn main() {
         background,
         WIDTH,
         HEIGHT,
-        1, // Anti-aliasing
+        2, // Anti-aliasing
     );
     image::save_buffer("hatch.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
 }
@@ -149,6 +149,20 @@ fn examples<'a>() -> HashMap<&'a str, (&'a str, Vec3)> {
         (
             "i=mod(floor(x/8)+floor(z/8),2),x=mod(x,8)-4,z=mod(z,8)-4,a=L(x,y,z)-1,q=L(x,z),b=max(D([1,.3],[q,y]),-5-y),a=rU(a,b,1),y+=1,a=rU(a,L(x,y*5,z)-.8,1),y+=3,a=rU(a,L(x,y*2,z)-1,.5),y+=1,a=rU(a,L(x,y*3,z)-1.7,0.1),min(a,y+.5*i*nz(x,y,z,8,0)))",
             v3(0.0, 0.0, -20.0)
+        )
+    );
+    examples.insert(
+        "plato",
+        (
+            "d=99,l=10, x-=l*2, y-=l,z+=2.5, @3{ x+=l, a=a0*($+2),s=sin(a),c=cos(a), [x1,y1]=rot(x,y,s,c), a=a1*($+2),s=sin(a),c=cos(a), [x1,z1]=rot(x1,z,s,c), d=rU(d, bx3(x1,y1,z1,4),3), } U(d+.5, L(nz(x,y,z,.1,1,2)-.5, abs(d)-.1)-.4)",
+            v3(0.0, 30.0, -10.0)
+        )
+    );
+    examples.insert(
+        "sprenkle",
+        (
+            "y+=7, rU( don(x,y-12,mod(z,8)-4,7+3*SM(9,15,y)+4*nz(x,y,z,.3,1),2.7-2*SM(9,15,y)+nz(x,y,z,.2,2)), L(x,y+83)-90,1)-.1*SM(0,.15,B(nz(x,y,z,2,0,3)))",
+            v3(0.0, 0.0, -40.0)
         )
     );
     examples

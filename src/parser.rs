@@ -417,7 +417,7 @@ fn function_name(i: &mut &str) -> PResult<FunctionName> {
             "qcl".map(|_| PolySmoothClamp),
             "g".map(|_| FakeSine),
         )),
-        "ri".map(|_| Hash),
+        alt(("ri".map(|_| Hash), "rot".map(|_| Rot))),
     ))
     .parse_next(i)
 }

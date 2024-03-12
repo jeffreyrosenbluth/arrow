@@ -91,6 +91,7 @@ pub enum FunctionName {
     // Floors,
     Rot0,
     Rot1,
+    Rot,
     Triangle,
     Corner,
     SmoothAbs,
