@@ -16,7 +16,7 @@ fn main() {
     use arrow::parser::*;
     let background = 0.75;
     let examples = examples();
-    let (mut input, pos) = *examples.get("sprenkle").unwrap();
+    let (mut input, pos) = *examples.get("else").unwrap();
     let ast = parse(&mut input);
     dbg!(&ast);
     let sdf: Sdf = Box::new(move |p| make_sdf(&ast, 0.1, 0.2, p));
@@ -30,8 +30,8 @@ fn main() {
         // Look at
         ZERO3,
         &vec![
-            Light::new(v3(0.0, 0.0, -26.0), 1.0),
-            // Light::new(v3(0.0, 30.0, -40.0), 1.0),
+            Light::new(v3(0.0, 0.0, -50.0), 1.5),
+            Light::new(v3(0.0, 10.0, 40.0), 1.0),
         ],
         background,
         WIDTH,
@@ -163,6 +163,34 @@ fn examples<'a>() -> HashMap<&'a str, (&'a str, Vec3)> {
         (
             "y+=7, rU( don(x,y-12,mod(z,8)-4,7+3*SM(9,15,y)+4*nz(x,y,z,.3,1),2.7-2*SM(9,15,y)+nz(x,y,z,.2,2)), L(x,y+83)-90,1)-.1*SM(0,.15,B(nz(x,y,z,2,0,3)))",
             v3(0.0, 0.0, -40.0)
+        )
+    );
+    examples.insert(
+        "target",
+        (
+            "n=nz(x,y,z,.4,0,2)*4; U(L(k(x,-12-z),-k(2-y,-19-x))-.5, L(TR(L(x,y)/4)*4+n,z-cl(-3,3,z))-.5-1.5*SM(3,-3,y)-3*SM(-3,-9,y) )",
+            v3(-3.0, 5.0, -29.0)
+        )
+    );
+    examples.insert(
+        "toy", 
+        (
+            "s=1,x1=x-.25,y1=y-4.6,z1=z; x=x1,y=y1, @4{ [x,y]=r0(x,y), [x,z]=r1(x,z), @xyz{$=sB($*2,.1)-4,} s*=.4, } rU( rU( bx3(x,y,z,4)*s-0.01, rG( L(x,y)-1.75, bx3(x,y,z,4)*0.2), 0.75), don(x1,y1,z1,9,.75),2.75)", 
+            v3(5.0, -5.0, -15.0)
+        )
+    );
+    examples.insert(
+        "shai_hulud",
+        (
+            "[x,z]=r0(x,z),m=nz(x,y,z,.4,1),r=30,t=.2,v=atan2(z,y-7),u=L(z,y-7), min( min(max(don(x+5,y+5.5,z+10,.5,.05),y+5.5), L(x*3+15,y/4+2.4,z*3+30)-1), rU(y-20+nz(x/3,y/3,z/2,1,1)+SM(30,0,15-B(x+sin(z/2)+sin(z/6)+sin(z/8)-4))*15+SM(30,0,15-B(mod(z+x+sin(x/2)+sin(x/6)+sin(x/8),60)-35))*15, max( -L(y-7,z,x+3)+4+sin(v*3-2), min( don(x-90,y+23,z,20,5+m), max(abs(don(x,y+r-7,z,r,5+m))-t,-x), max(abs(L(x,y-7,z)-5-m)-t,x), L(u/3-1,B(B(B(x*2-4)-2)-2)-1,mod(x/2+v*9,1.6)-.8)-.34) ),2) )",
+            v3(-8.0, 5.0, 40.0)
+        )
+    );
+    examples.insert(
+        "else",
+        (
+           "y-=1, r=bx3(x,y,z,9)-2,s=1,ti=U(L(x,y)-.6, L(y,z)-.6,L(z,x)-.6); @4{ @xyz{$=(mod($+9,18)-9)*3,} s/=3, r=k(r+s,-U(@xyz{L($,$$)-12,})*s)-s, } U(r, ti)",
+            v3(0.0, 20.0, -20.0) 
         )
     );
     examples

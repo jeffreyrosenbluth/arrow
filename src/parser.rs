@@ -473,8 +473,10 @@ mod tests {
         // let input = "i=0, sin(i++)";
         // let input = "a = sin(x) > cos(x) && sin(y) < cos(y)";
         // let input = "ri(x,y,z)>.4&&L(x,y,z)>3?L(x,y,z)-2:10";
-        let input = "@xyz{$m=mod($,20)-10,$i=Z($/20),}d=99,g=.05,y-=20,[z,x]=r0(z,x),n=nz(x,y,z,.1,1),n1=nz(x,y,z,.3,2,3),@4{x-=20,o=$*200+20,e=B(y+n1/2+sin(z*.05+o)*10)-1,e=rG(e,B(z+sin(x*.05+o)*25)-5+n1*2,.2),@xz{$1=mod($+n*10,3)-1.5,}e=rG(e,-(B(z1)-g),.25),e=rG(e,-(B(x1)-g),.25),d=U(d,e),[x,z]=r1(z,x),y+=20,}U(d,ri(xi,yi,zi)>.4&&L(xi,yi,zi)>3?L(xm,ym,zm)-2:10)";
+        // let input = "@xyz{$m=mod($,20)-10,$i=Z($/20),}d=99,g=.05,y-=20,[z,x]=r0(z,x),n=nz(x,y,z,.1,1),n1=nz(x,y,z,.3,2,3),@4{x-=20,o=$*200+20,e=B(y+n1/2+sin(z*.05+o)*10)-1,e=rG(e,B(z+sin(x*.05+o)*25)-5+n1*2,.2),@xz{$1=mod($+n*10,3)-1.5,}e=rG(e,-(B(z1)-g),.25),e=rG(e,-(B(x1)-g),.25),d=U(d,e),[x,z]=r1(z,x),y+=20,}U(d,ri(xi,yi,zi)>.4&&L(xi,yi,zi)>3?L(xm,ym,zm)-2:10)";
+        let input = "y-=1, r=bx3(x,y,z,9)-2,s=1,ti=U(L(x,y)-.6, L(y,z)-.6,L(z,x)-.6); @4{ @xyz{$=(mod($+9,18)-9)*3,} s/=3, r=k(r+s,-U(@xyz{L($,$$)-12,})*s)-s, } U(r, ti)";
         let i = &expand(input);
+        dbg!(&i);
         let _ = dbg!(program.parse_peek(i));
     }
     #[test]

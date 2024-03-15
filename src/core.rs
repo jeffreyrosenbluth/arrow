@@ -221,13 +221,14 @@ pub fn noise(x: Vec3) -> f32 {
 
 // The range of the noise depends on the number of octaves.
 pub fn fbm(x: f32, y: f32, z: f32, scale: f32, offset: f32, octaves: u32) -> f32 {
-    let mut p = v3(x, y, z) * scale + v3(offset, offset, offset);
-    let mut a = 0.0;
+    let mut p = v3(x, y, z) * scale;
+    let voff = v3(offset, offset, offset);
+    let mut a = 1.0;
     let mut sum = 0.0;
-    for o in 1..=octaves {
-        a += 1.0 / (2.0 * o as f32);
+    for _ in 1..=octaves {
+        a *= 0.5;
+        sum += a * noise(p + voff);
         p *= 2.03;
-        sum += a * noise(p);
     }
     sum
 }

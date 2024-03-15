@@ -1,6 +1,7 @@
 use crate::core::{v3, Light, Lum, Sdf, LUM, SHINE};
 use glam::{Mat3, Vec3};
 use rayon::prelude::*;
+use wassily::stipple::poisson_disk;
 
 const MAX_STEPS: u32 = 128; //512;
 const MAX_DIST: f32 = 75.0;
@@ -133,4 +134,44 @@ pub fn render(
         }
     }
     img_data
+}
+
+// XXX Fix this function to return image data
+pub fn render_stipple(
+    sdf: &Sdf,
+    camera_pos: Vec3,
+    look_at: Vec3,
+    lights: &[Light],
+    background: f32,
+    width: u32,
+    height: u32,
+    anti_aliasing: u32,
+) -> Vec<(f32, f32, f32)> {
+    let cam_mat = camera(camera_pos, look_at);
+    let pts = poisson_disk(width as f32, height as f32, 3.0, 0);
+    let img_data = pts.into_par_iter().map(|p| {
+        let mut col = 0.0;
+        for m in 0..anti_aliasing {
+            for n in 0..anti_aliasing {
+                let ox = (m as f32) / (anti_aliasing as f32) - 0.5;
+                let oy = (n as f32) / (anti_aliasing as f32) - 0.5;
+                let uv = Vec3::new(
+                    (p.x as f32) / (height as f32),
+                    (height as f32 - p.y as f32) / (height as f32), // flip y
+                    0.0,
+                );
+                let rd = cam_mat
+                    * Vec3::new(
+                        (uv.x + ox / height as f32) * 2.0 - 1.0,
+                        (uv.y + oy / height as f32) * 2.0 - 1.0,
+                        1.0,
+                    )
+                    .normalize();
+                col += march(sdf, camera_pos, rd, lights, background);
+            }
+        }
+        col /= (anti_aliasing * anti_aliasing) as f32;
+        (p.x, p.y, col)
+    });
+    img_data.collect()
 }
