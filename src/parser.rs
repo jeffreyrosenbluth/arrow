@@ -1,15 +1,18 @@
-use crate::ast::*;
+use std::ops::Neg;
+
 use crate::expand::expand;
+use crate::lexer::Delim;
+use crate::lexer::{lex, Binary, Delim::*, Token, Token::BinOp, Token::Delimiter, Unary};
+use crate::{ast, ast::AssignExpr::*, ast::Expr, ast::Statement};
 
 // use serde::de;
 use winnow::ascii::{alpha1, alphanumeric0};
 use winnow::combinator::{fail, opt, separated};
 use winnow::prelude::*;
-use winnow::token::take;
 use winnow::{
     ascii::{float, multispace0 as multispaces},
     combinator::{alt, delimited, repeat},
-    token::one_of,
+    token::{one_of, take},
 };
 
 pub fn parse(input: &mut &str) -> Statement {
@@ -17,81 +20,34 @@ pub fn parse(input: &mut &str) -> Statement {
     program(&mut i_str).unwrap()
 }
 
-fn lbracket<'a>(i: &mut &'a str) -> PResult<&'a str> {
-    delimited(multispaces, "[", multispaces).parse_next(i)
-}
-
-fn rbracket<'a>(i: &mut &'a str) -> PResult<&'a str> {
-    delimited(multispaces, "]", multispaces).parse_next(i)
-}
-
-fn rbrace<'a>(i: &mut &'a str) -> PResult<&'a str> {
-    delimited(multispaces, "}", multispaces).parse_next(i)
-}
-
-fn comma<'a>(i: &mut &'a str) -> PResult<&'a str> {
-    delimited(multispaces, ",", multispaces).parse_next(i)
-}
-
-fn gt<'a>(i: &mut &'a str) -> PResult<&'a str> {
-    delimited(multispaces, ">", multispaces).parse_next(i)
-}
-
-fn ge<'a>(i: &mut &'a str) -> PResult<&'a str> {
-    delimited(multispaces, ">=", multispaces).parse_next(i)
-}
-
-fn lt<'a>(i: &mut &'a str) -> PResult<&'a str> {
-    delimited(multispaces, "<", multispaces).parse_next(i)
-}
-
-fn le<'a>(i: &mut &'a str) -> PResult<&'a str> {
-    delimited(multispaces, "<=", multispaces).parse_next(i)
-}
-
-fn equal<'a>(i: &mut &'a str) -> PResult<&'a str> {
-    delimited(multispaces, "==", multispaces).parse_next(i)
-}
-
-fn and<'a>(i: &mut &'a str) -> PResult<&'a str> {
-    delimited(multispaces, "&&", multispaces).parse_next(i)
-}
-fn or<'a>(i: &mut &'a str) -> PResult<&'a str> {
-    delimited(multispaces, "||", multispaces).parse_next(i)
-}
-
-fn pow<'a>(i: &mut &'a str) -> PResult<&'a str> {
-    delimited(multispaces, "**", multispaces).parse_next(i)
-}
-
-fn program(i: &mut &str) -> PResult<Statement> {
+fn program(i: &mut &[Token]) -> PResult<Statement> {
     separated(1.., statement, alt((",", ";")))
         .map(Statement::Sequence)
         .parse_next(i)
 }
 
-fn statement(i: &mut &str) -> PResult<Statement> {
-    delimited(
-        multispaces,
-        alt((
-            rbrace.map(|_| Statement::Empty),
-            assign_array,
-            assign_add,
-            assign_sub,
-            assign_mul,
-            assign_div,
-            assign_inc,
-            assign_dec,
-            assign_scalar,
-            return_statement,
-            program,
-        )),
-        multispaces,
-    )
-    .parse_next(i)
+fn statement(i: &mut &[Token]) -> PResult<Statement> {
+    let body = opt(alt((
+        assign_array,
+        assign_add,
+        assign_sub,
+        assign_mul,
+        assign_div,
+        assign_inc,
+        assign_dec,
+        assign_scalar,
+        return_statement,
+        program,
+    )));
+    let result =
+        delimited(one_of(Delimiter(LBrace)), body, one_of(Delimiter(RBrace))).parse_next(i)?;
+    match result {
+        Some(s) => Ok(s),
+        None => Ok(Statement::Empty),
+    }
 }
 
-fn ternary(i: &mut &str) -> PResult<Expr> {
+fn ternary(i: &mut &[Token]) -> PResult<Expr> {
     let condition = logic.parse_next(i)?;
     delimited(multispaces, "?", multispaces).parse_next(i)?;
     let if_true = expr.parse_next(i)?;
@@ -104,11 +60,11 @@ fn ternary(i: &mut &str) -> PResult<Expr> {
     ))
 }
 
-fn expr(i: &mut &str) -> PResult<Expr> {
-    delimited(multispaces, alt((ternary, logic)), multispaces).parse_next(i)
+fn expr(i: &mut &[Token]) -> PResult<Expr> {
+    alt((ternary, logic)).parse_next(i)
 }
 
-fn comp(i: &mut &str) -> PResult<Expr> {
+fn comp(i: &mut &[Token]) -> PResult<Expr> {
     use BinOp::*;
     let lhs = sum.parse_next(i)?;
     let r = opt((alt((gt, ge, lt, le, equal)), sum)).parse_next(i)?;
@@ -126,7 +82,7 @@ fn comp(i: &mut &str) -> PResult<Expr> {
     }
 }
 
-fn logic(i: &mut &str) -> PResult<Expr> {
+fn logic(i: &mut &[Token]) -> PResult<Expr> {
     use BinOp::*;
     let init = comp.parse_next(i)?;
 
@@ -144,80 +100,95 @@ fn logic(i: &mut &str) -> PResult<Expr> {
         .parse_next(i)
 }
 
-fn sum(i: &mut &str) -> PResult<Expr> {
-    use BinOp::*;
+fn sum(i: &mut &[Token]) -> PResult<Expr> {
+    use ast::BinOp::*;
     let init = product.parse_next(i)?;
 
-    repeat(0.., (one_of(['+', '-']), product))
-        .fold(
-            move || init.clone(),
-            |acc, (op, val): (char, Expr)| {
-                if op == '+' {
-                    Expr::BinaryOp(Add(Box::new(acc), Box::new(val)))
-                } else {
-                    Expr::BinaryOp(Sub(Box::new(acc), Box::new(val)))
-                }
-            },
-        )
-        .parse_next(i)
+    repeat(
+        0..,
+        (
+            one_of([Token::BinOp(Binary::Add), Token::BinOp(Binary::Sub)]),
+            product,
+        ),
+    )
+    .fold(
+        move || init.clone(),
+        |acc, (op, val): (Token, Expr)| {
+            if op == Token::BinOp(Binary::Add) {
+                Expr::BinaryOp(Add(Box::new(acc), Box::new(val)))
+            } else {
+                Expr::BinaryOp(Sub(Box::new(acc), Box::new(val)))
+            }
+        },
+    )
+    .parse_next(i)
 }
 
-fn product(i: &mut &str) -> PResult<Expr> {
-    use BinOp::*;
+fn product(i: &mut &[Token]) -> PResult<Expr> {
+    use ast::BinOp::*;
     let init = power.parse_next(i)?;
 
-    repeat(0.., (one_of(['*', '/']), power))
-        .fold(
-            move || init.clone(),
-            |acc, (op, val): (char, Expr)| {
-                if op == '*' {
-                    Expr::BinaryOp(Mul(Box::new(acc), Box::new(val)))
-                } else {
-                    Expr::BinaryOp(Div(Box::new(acc), Box::new(val)))
-                }
-            },
-        )
-        .parse_next(i)
+    repeat(
+        0..,
+        (
+            one_of([Token::BinOp(Binary::Mul), Token::BinOp(Binary::Div)]),
+            power,
+        ),
+    )
+    .fold(
+        move || init.clone(),
+        |acc, (op, val): (Token, Expr)| {
+            if op == Token::BinOp(Binary::Mul) {
+                Expr::BinaryOp(Mul(Box::new(acc), Box::new(val)))
+            } else {
+                Expr::BinaryOp(Div(Box::new(acc), Box::new(val)))
+            }
+        },
+    )
+    .parse_next(i)
 }
 
-fn power(i: &mut &str) -> PResult<Expr> {
-    use BinOp::*;
+fn power(i: &mut &[Token]) -> PResult<Expr> {
+    use ast::BinOp::*;
     let lhs = factor.parse_next(i)?;
-    let r = opt((pow, factor)).parse_next(i)?;
+    let r = opt((one_of(Token::BinOp(Binary::Pow)), factor)).parse_next(i)?;
     match r {
         Some(r) => Ok(Expr::BinaryOp(Pow(Box::new(lhs), Box::new(r.1)))),
         None => Ok(lhs),
     }
 }
 
-fn factor(i: &mut &str) -> PResult<Expr> {
-    let negation = opt('-').map(|op| op.is_some());
-    let p = alt((float.map(Expr::Scalar), assign, function, variable, parens));
-    let expression = delimited(multispaces, p, multispaces);
+fn factor(i: &mut &[Token]) -> PResult<Expr> {
+    let negation = opt(one_of(Token::UnOp(Unary::Neg))).map(|op| op.is_some());
+    let expression = alt((float.map(Expr::Scalar), assign, function, variable, parens));
     (negation, expression)
         .map(|(n, e)| if n { Expr::Negate(Box::new(e)) } else { e })
         .parse_next(i)
 }
 
-fn assign(i: &mut &str) -> PResult<Expr> {
+fn assign(i: &mut &[Token]) -> PResult<Expr> {
     let var = identifier.parse_next(i)?;
-    let op = delimited(multispaces, alt(("++", "--")), multispaces).parse_next(i)?;
-    if op == "++" {
-        Ok(Expr::Assign(AssignExpr::Inc(var)))
-    } else {
-        Ok(Expr::Assign(AssignExpr::Dec(var)))
+    let op = alt((
+        one_of(Token::UnOp(Unary::Inc)),
+        one_of(Token::UnOp(Unary::Dec)),
+    ))
+    .parse_next(i)?;
+    match op {
+        Token::UnOp(Unary::Inc) => Ok(Expr::Assign(Inc(var))),
+        Token::UnOp(Unary::Dec) => Ok(Expr::Assign(Dec(var))),
+        _ => unreachable!(),
     }
 }
 
-fn parens(i: &mut &str) -> PResult<Expr> {
-    delimited("(", expr, ")")
+fn parens(i: &mut &[Token]) -> PResult<Expr> {
+    delimited(one_of(Delimiter(LParen)), expr, one_of(Delimiter(RParen)))
         .map(|e| Expr::Paren(Box::new(e)))
         .parse_next(i)
 }
 
-fn assign_scalar(i: &mut &str) -> PResult<Statement> {
+fn assign_scalar(i: &mut &[Token]) -> PResult<Statement> {
     let var = identifier.parse_next(i)?;
-    delimited(multispaces, "=", multispaces).parse_next(i)?;
+    one_of(Token::BinOp(Binary::Assign)).parse_next(i)?;
     let rhs = expr.parse_next(i)?;
     Ok(Statement::Assign {
         var,
@@ -225,10 +196,13 @@ fn assign_scalar(i: &mut &str) -> PResult<Statement> {
     })
 }
 
-fn assign_array(i: &mut &str) -> PResult<Statement> {
-    let vars: Vec<String> =
-        delimited(lbracket, separated(1.., identifier, comma), rbracket).parse_next(i)?;
-    delimited(multispaces, "=", multispaces).parse_next(i)?;
+fn assign_array(i: &mut &[Token]) -> PResult<Statement> {
+    let vars: Vec<String> = delimited(
+        one_of(Token::Delimiter(Delim::LBracket)),
+        separated(1.., identifier, one_of(Token::Delimiter(Delim::Comma))),
+        one_of(Token::Delimiter(Delim::RBracket)),
+    )
+    .parse_next(i)?;
     let expression = expr.parse_next(i)?;
     Ok(Statement::AssignArray {
         vars,
@@ -236,10 +210,10 @@ fn assign_array(i: &mut &str) -> PResult<Statement> {
     })
 }
 
-fn assign_add(i: &mut &str) -> PResult<Statement> {
+fn assign_add(i: &mut &[Token]) -> PResult<Statement> {
     use crate::ast::BinOp::*; // Not sure why this is needed, otherwise it complains about Add not being in scope.
     let var = identifier.parse_next(i)?;
-    delimited(multispaces, "+=", multispaces).parse_next(i)?;
+    one_of(Token::BinOp(Binary::AssignAdd)).parse_next(i)?;
     let rhs = expr.parse_next(i)?;
     Ok(Statement::Assign {
         var: var.clone(),
@@ -250,10 +224,10 @@ fn assign_add(i: &mut &str) -> PResult<Statement> {
     })
 }
 
-fn assign_sub(i: &mut &str) -> PResult<Statement> {
+fn assign_sub(i: &mut &[Token]) -> PResult<Statement> {
     use crate::ast::BinOp::*; // Not sure why this is needed, otherwise it complains about Sub not being in scope.
     let var = identifier.parse_next(i)?;
-    delimited(multispaces, "-=", multispaces).parse_next(i)?;
+    one_of(Token::BinOp(Binary::AssignSub)).parse_next(i)?;
     let rhs = expr.parse_next(i)?;
     Ok(Statement::Assign {
         var: var.clone(),
@@ -264,10 +238,10 @@ fn assign_sub(i: &mut &str) -> PResult<Statement> {
     })
 }
 
-fn assign_mul(i: &mut &str) -> PResult<Statement> {
+fn assign_mul(i: &mut &[Token]) -> PResult<Statement> {
     use crate::ast::BinOp::*; // Not sure why this is needed, otherwise it complains about Mul not being in scope.
     let var = identifier.parse_next(i)?;
-    delimited(multispaces, "*=", multispaces).parse_next(i)?;
+    one_of(Token::BinOp(Binary::AssignMul)).parse_next(i)?;
     let rhs = expr.parse_next(i)?;
     Ok(Statement::Assign {
         var: var.clone(),
@@ -278,10 +252,10 @@ fn assign_mul(i: &mut &str) -> PResult<Statement> {
     })
 }
 
-fn assign_div(i: &mut &str) -> PResult<Statement> {
-    use crate::ast::BinOp::*; // Not sure why this is needed, otherwise it complains about Div not being in scope.
+fn assign_div(i: &mut &[Token]) -> PResult<Statement> {
+    use crate::ast::BinOp::*;
     let var = identifier.parse_next(i)?;
-    delimited(multispaces, "/=", multispaces).parse_next(i)?;
+    one_of(Token::BinOp(Binary::AssignDiv)).parse_next(i)?;
     let rhs = expr.parse_next(i)?;
     Ok(Statement::Assign {
         var: var.clone(),
@@ -292,152 +266,54 @@ fn assign_div(i: &mut &str) -> PResult<Statement> {
     })
 }
 
-fn assign_inc(i: &mut &str) -> PResult<Statement> {
-    let var = identifier.parse_next(i)?;
-    delimited(multispaces, "++", multispaces).parse_next(i)?;
+fn assign_inc(i: &mut &[Token]) -> PResult<Statement> {
+    use crate::ast::BinOp::*;
+    let var = one_of(Token::Variable).parse_next(i)?;
+    one_of(Token::UnOp(Unary::Inc)).parse_next(i)?;
+    let rhs = expr.parse_next(i)?;
     Ok(Statement::Assign {
         var: var.clone(),
-        rhs: Box::new(Expr::BinaryOp(BinOp::Add(
+        rhs: Box::new(Expr::BinaryOp(Add(
             Box::new(Expr::Variable(var)),
             Box::new(Expr::Scalar(1.0)),
         ))),
     })
 }
 
-fn assign_dec(i: &mut &str) -> PResult<Statement> {
+fn assign_dec(i: &mut &[Token]) -> PResult<Statement> {
+    use crate::ast::BinOp::*;
     let var = identifier.parse_next(i)?;
-    delimited(multispaces, "--", multispaces).parse_next(i)?;
+    one_of(Token::UnOp(Unary::Dec)).parse_next(i)?;
+    let rhs = expr.parse_next(i)?;
     Ok(Statement::Assign {
         var: var.clone(),
-        rhs: Box::new(Expr::BinaryOp(BinOp::Sub(
+        rhs: Box::new(Expr::BinaryOp(Sub(
             Box::new(Expr::Variable(var)),
             Box::new(Expr::Scalar(1.0)),
         ))),
     })
 }
 
-fn return_statement(i: &mut &str) -> PResult<Statement> {
+fn return_statement(i: &mut &[Token]) -> PResult<Statement> {
     expr.map(|e| Statement::Return(Box::new(e))).parse_next(i)
 }
 
-fn identifier(i: &mut &str) -> PResult<String> {
-    let c1 = opt("$").parse_next(i)?;
-    if c1 == Some("$") {
-        return Ok("$".to_string());
-    };
-    let c1 = take(1u8).and_then(alpha1).parse_next(i)?;
-    let c2 = opt(alphanumeric0).parse_next(i)?;
-    match c2 {
-        Some(c) => {
-            if c.len() > 1 {
-                fail(i)
-            } else {
-                Ok(format!("{}{}", c1, c))
-            }
-        }
-        None => Ok(c1.to_string()),
-    }
-}
-
-fn variable(i: &mut &str) -> PResult<Expr> {
-    identifier.map(Expr::Variable).parse_next(i)
-}
-
-// rot Infinity map reduce
-
-fn function_name(i: &mut &str) -> PResult<FunctionName> {
-    use FunctionName::*;
-    alt((
-        alt((
-            "sin".map(|_| Sin),
-            "cos".map(|_| Cos),
-            "tan".map(|_| Tan),
-            "atan2".map(|_| Atan2),
-            "exp".map(|_| Exp),
-            "exp2".map(|_| Exp2),
-            "log".map(|_| Log),
-            "log2".map(|_| Log2),
-            "pow".map(|_| Pow),
-            "sqrt".map(|_| Sqrt),
-            "abs".map(|_| Abs),
-            "sign".map(|_| Sign),
-            "floor".map(|_| Floor),
-            "ceil".map(|_| Ceil),
-            "fract".map(|_| Fract),
-            "FR".map(|_| Fract),
-            "mod".map(|_| Mod),
-            "min".map(|_| Min),
-            "max".map(|_| Max),
-            "cl".map(|_| Clamp),
-            "mix".map(|_| Mix),
-        )),
-        alt((
-            "B".map(|_| Abs),
-            "SM".map(|_| Smoothstep),
-            "L".map(|_| Length),
-            "H".map(|_| Distance),
-            "A".map(|_| AddMul),
-            "D".map(|_| Dot),
-            "X".map(|_| Cross),
-            "N".map(|_| Normalize),
-            "U".map(|_| Union),
-            "G".map(|_| Intersect),
-            "Z".map(|_| Floor),
-            "nz".map(|_| ValueNoise),
-            "don".map(|_| Torus),
-            "bx2".map(|_| Box2),
-            "bx3".map(|_| Box3),
-            "r0".map(|_| Rot0),
-            "r1".map(|_| Rot1),
-            "TR".map(|_| Triangle),
-            "k".map(|_| Corner),
-            "sB".map(|_| SmoothAbs),
-            "scl".map(|_| SmoothClamp),
-        )),
-        alt((
-            "r0".map(|_| Rot0),
-            "r1".map(|_| Rot1),
-            "rG".map(|_| RoundMax),
-            "rmax".map(|_| RoundMax),
-            "rU".map(|_| RoundMin),
-            "rmin".map(|_| RoundMin),
-            "acos".map(|_| Acos),
-            "asin".map(|_| Asin),
-            "atan".map(|_| Atan),
-            "sinh".map(|_| Sinh),
-            "cosh".map(|_| Cosh),
-            "tanh".map(|_| Tanh),
-            "trunc".map(|_| Trunc),
-            "acosh".map(|_| Acosh),
-            "asinh".map(|_| Asinh),
-            "atanh".map(|_| Atanh),
-            "qB".map(|_| PolySmoothAbs),
-            "sabs".map(|_| SmoothAbs),
-            "round".map(|_| Round),
-            "qcl".map(|_| PolySmoothClamp),
-            "g".map(|_| FakeSine),
-        )),
-        alt(("ri".map(|_| Hash), "rot".map(|_| Rot))),
-    ))
-    .parse_next(i)
-}
-
-fn list(i: &mut &str) -> PResult<Vec<Expr>> {
+fn list(i: &mut &[Token]) -> PResult<Vec<Expr>> {
     delimited(lbracket, separated(0.., expr, comma), rbracket).parse_next(i)
 }
 
-fn arg_list(i: &mut &str) -> PResult<Vec<Expr>> {
+fn arg_list(i: &mut &[Token]) -> PResult<Vec<Expr>> {
     let ls: Vec<Vec<Expr>> = separated(1.., list, comma).parse_next(i)?;
     Ok(ls.into_iter().flatten().collect())
 }
 
-fn args(i: &mut &str) -> PResult<Vec<Expr>> {
+fn args(i: &mut &[Token]) -> PResult<Vec<Expr>> {
     let r = alt((arg_list, separated(0.., expr, comma))).parse_next(i)?;
     let _ = opt(comma).parse_next(i);
     Ok(r)
 }
 
-fn function(i: &mut &str) -> PResult<Expr> {
+fn function(i: &mut &[Token]) -> PResult<Expr> {
     let name = function_name.parse_next(i)?;
     delimited(multispaces, "(", multispaces).parse_next(i)?;
     let args = args.parse_next(i)?;

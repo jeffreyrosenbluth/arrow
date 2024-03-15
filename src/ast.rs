@@ -43,7 +43,7 @@ pub enum AssignExpr {
     Dec(String),
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub enum FunctionName {
     Sin,
     Cos,
@@ -88,7 +88,6 @@ pub enum FunctionName {
     Torus,
     Box2,
     Box3,
-    // Floors,
     Rot0,
     Rot1,
     Rot,

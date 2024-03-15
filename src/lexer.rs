@@ -5,6 +5,8 @@ use winnow::{
     token::{any, take},
 };
 
+use crate::ast::FunctionName;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     ScalarVal(f32),
@@ -12,7 +14,8 @@ pub enum Token {
     UnOp(Unary),
     TernaryOp(Ternary),
     Delimiter(Delim),
-    Identifier(String),
+    Variable(String),
+    Function(FunctionName),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -146,16 +149,85 @@ fn token(i: &mut &str) -> PResult<Token> {
 }
 
 fn identifier(i: &mut &str) -> PResult<Token> {
+    use FunctionName::*;
+    use Token::*;
     let c1 = take(1u8).and_then(alpha1).parse_next(i)?;
     let c2 = opt(alphanumeric0).parse_next(i)?;
-    match c2 {
-        Some(c) => Ok(Token::Identifier(format!("{}{}", c1, c))),
-        None => Ok(Token::Identifier(c1.to_string())),
+    let s = match c2 {
+        Some(c) => format!("{}{}", c1, c),
+        None => c1.to_string(),
+    };
+    match s.as_str() {
+        "sin" => Ok(Function(Sin)),
+        "cos" => Ok(Function(Cos)),
+        "tan" => Ok(Function(Tan)),
+        "atan2" => Ok(Function(Atan2)),
+        "exp" => Ok(Function(Exp)),
+        "exp2" => Ok(Function(Exp2)),
+        "log" => Ok(Function(Log)),
+        "log2" => Ok(Function(Log2)),
+        "pow" => Ok(Function(Pow)),
+        "sqrt" => Ok(Function(Sqrt)),
+        "abs" => Ok(Function(Abs)),
+        "sign" => Ok(Function(Sign)),
+        "floor" => Ok(Function(Floor)),
+        "ceil" => Ok(Function(Ceil)),
+        "fract" => Ok(Function(Fract)),
+        "FR" => Ok(Function(Fract)),
+        "mod" => Ok(Function(Mod)),
+        "min" => Ok(Function(Min)),
+        "max" => Ok(Function(Max)),
+        "clamp" => Ok(Function(Clamp)),
+        "mix" => Ok(Function(Mix)),
+        "B" => Ok(Function(Abs)),
+        "SM" => Ok(Function(Smoothstep)),
+        "L" => Ok(Function(Length)),
+        "H" => Ok(Function(Distance)),
+        "A" => Ok(Function(AddMul)),
+        "D" => Ok(Function(Dot)),
+        "X" => Ok(Function(Cross)),
+        "N" => Ok(Function(Normalize)),
+        "U" => Ok(Function(Union)),
+        "G" => Ok(Function(Intersect)),
+        "Z" => Ok(Function(Floor)),
+        "nz" => Ok(Function(ValueNoise)),
+        "don" => Ok(Function(Torus)),
+        "bx2" => Ok(Function(Box2)),
+        "bx3" => Ok(Function(Box3)),
+        "r0" => Ok(Function(Rot0)),
+        "r1" => Ok(Function(Rot1)),
+        "TR" => Ok(Function(Triangle)),
+        "k" => Ok(Function(Corner)),
+        "sB" => Ok(Function(SmoothAbs)),
+        "scl" => Ok(Function(SmoothClamp)),
+        "rG" => Ok(Function(RoundMax)),
+        "rmax" => Ok(Function(RoundMax)),
+        "rU" => Ok(Function(RoundMin)),
+        "rmin" => Ok(Function(RoundMin)),
+        "acos" => Ok(Function(Acos)),
+        "asin" => Ok(Function(Asin)),
+        "atan" => Ok(Function(Atan)),
+        "sinh" => Ok(Function(Sinh)),
+        "cosh" => Ok(Function(Cosh)),
+        "tanh" => Ok(Function(Tanh)),
+        "trunc" => Ok(Function(Trunc)),
+        "asinh" => Ok(Function(Asinh)),
+        "acosh" => Ok(Function(Acosh)),
+        "atanh" => Ok(Function(Atanh)),
+        "qB" => Ok(Function(PolySmoothAbs)),
+        "sabs" => Ok(Function(SmoothAbs)),
+        "round" => Ok(Function(Round)),
+        "qcl" => Ok(Function(PolySmoothClamp)),
+        "g" => Ok(Function(FakeSine)),
+        "ri" => Ok(Function(Hash)),
+        "rot" => Ok(Function(Rot)),
+        _ => Ok(Variable(s.to_string())),
     }
 }
 
 mod tests {
     use super::*;
+    use crate::ast::*;
     use crate::expand::expand;
 
     #[test]
@@ -166,26 +238,56 @@ mod tests {
         let i = expand(input);
         let _ = dbg!(lex.parse_peek(&i));
     }
+    #[test]
+    fn test_function() {
+        use Token::*;
+        let input = "s = G(x,y,z); t = rmin(x, y, s)";
+        let expected = vec![
+            Variable("s".to_string()),
+            BinOp(Binary::Assign),
+            Function(FunctionName::Intersect),
+            Delimiter(Delim::LParen),
+            Variable("x".to_string()),
+            Delimiter(Delim::Comma),
+            Variable("y".to_string()),
+            Delimiter(Delim::Comma),
+            Variable("z".to_string()),
+            Delimiter(Delim::RParen),
+            Delimiter(Delim::Semicolon),
+            Variable("t".to_string()),
+            BinOp(Binary::Assign),
+            Function(FunctionName::RoundMin),
+            Delimiter(Delim::LParen),
+            Variable("x".to_string()),
+            Delimiter(Delim::Comma),
+            Variable("y".to_string()),
+            Delimiter(Delim::Comma),
+            Variable("s".to_string()),
+            Delimiter(Delim::RParen),
+        ];
+        assert_eq!(lex.parse_peek(input), Ok(("", expected)));
+    }
 
     #[test]
-    fn test_lex() {
+    fn test_assign() {
+        use Token::*;
         let input = "variable0 = 1 + 2.8 * .3 - 4 / 5 % 6 ** 7";
         let expected = vec![
-            Token::Identifier("variable0".to_string()),
-            Token::BinOp(Binary::Assign),
-            Token::ScalarVal(1.0),
-            Token::BinOp(Binary::Add),
-            Token::ScalarVal(2.8),
-            Token::BinOp(Binary::Mul),
-            Token::ScalarVal(0.3),
-            Token::BinOp(Binary::Sub),
-            Token::ScalarVal(4.0),
-            Token::BinOp(Binary::Div),
-            Token::ScalarVal(5.0),
-            Token::BinOp(Binary::Mod),
-            Token::ScalarVal(6.0),
-            Token::BinOp(Binary::Pow),
-            Token::ScalarVal(7.0),
+            Variable("variable0".to_string()),
+            BinOp(Binary::Assign),
+            ScalarVal(1.0),
+            BinOp(Binary::Add),
+            ScalarVal(2.8),
+            BinOp(Binary::Mul),
+            ScalarVal(0.3),
+            BinOp(Binary::Sub),
+            ScalarVal(4.0),
+            BinOp(Binary::Div),
+            ScalarVal(5.0),
+            BinOp(Binary::Mod),
+            ScalarVal(6.0),
+            BinOp(Binary::Pow),
+            ScalarVal(7.0),
         ];
         assert_eq!(lex.parse_peek(input), Ok(("", expected)));
     }
