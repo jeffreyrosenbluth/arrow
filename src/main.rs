@@ -36,7 +36,7 @@ fn main() {
         background,
         WIDTH,
         HEIGHT,
-        2, // Anti-aliasing
+        1, // Anti-aliasing
     );
     image::save_buffer("hatch.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
 }

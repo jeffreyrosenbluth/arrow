@@ -147,7 +147,7 @@ fn eval_expr(env: &mut Environment, ast: Box<Expr>) -> Value {
                     ScalarVal(value) => ScalarVal(value + 1.0),
                     _ => panic!("inc expects scalar values"),
                 };
-                env.insert(var.clone(), v);
+                env.insert(var, v);
                 env.insert("#".to_string(), v);
                 v
             }
@@ -174,6 +174,14 @@ fn eval_binop(env: &mut Environment, ast: BinOp) -> Value {
             match (a, b) {
                 (ScalarVal(a), ScalarVal(b)) => BoolVal(a == b),
                 _ => panic!("== expects scalar values"),
+            }
+        }
+        BinOp::NotEq(a, b) => {
+            let a = eval_expr(env, a);
+            let b = eval_expr(env, b);
+            match (a, b) {
+                (ScalarVal(a), ScalarVal(b)) => BoolVal(a != b),
+                _ => panic!("!= expects scalar values"),
             }
         }
         BinOp::Greater(a, b) => {

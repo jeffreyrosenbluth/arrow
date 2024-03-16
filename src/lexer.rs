@@ -10,16 +10,6 @@ use crate::ast::FunctionName;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     ScalarVal(f32),
-    BinOp(Binary),
-    UnOp(Unary),
-    TernaryOp(Ternary),
-    Delimiter(Delim),
-    Variable(String),
-    Function(FunctionName),
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Binary {
     Add,
     Sub,
     Mul,
@@ -39,25 +29,9 @@ pub enum Binary {
     AssignSub,
     AssignMul,
     AssignDiv,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Unary {
-    Neg,
     Not,
     Inc,
     Dec,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Ternary {
-    Then,
-    Else,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-
-pub enum Delim {
     LParen,
     RParen,
     LBrace,
@@ -66,6 +40,28 @@ pub enum Delim {
     RBracket,
     Comma,
     Semicolon,
+    Then,
+    Else,
+    Variable(String),
+    Function(FunctionName),
+}
+
+impl core::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Token::*;
+        match self {
+            ScalarVal(v) => write!(f, "{}", v),
+            Variable(v) => write!(f, "{}", v),
+            Function(e) => write!(f, "{:?}", e),
+            a => write!(f, "{:?}", a),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Ternary {
+    Then,
+    Else,
 }
 
 impl winnow::stream::ContainsToken<Token> for Token {
@@ -101,46 +97,43 @@ pub fn lex(i: &mut &str) -> PResult<Vec<Token>> {
 }
 
 fn token(i: &mut &str) -> PResult<Token> {
-    use Binary::*;
-    use Delim::*;
-    use Ternary::*;
     use Token::*;
     let single = dispatch! {peek(any);
         // '0'..='9' => digit1.try_map(FromStr::from_str).map(Token::ScalarVal),
         '0'..='9' | '.' => float.map(Token::ScalarVal),
-        '(' => '('.value(Delimiter(LParen)),
-        ')' => ')'.value(Delimiter(RParen)),
-        '[' => '['.value(Delimiter(LBracket)),
-        ']' => ']'.value(Delimiter(RBracket)),
-        '{' => '{'.value(Delimiter(LBrace)),
-        '}'=> '}'.value(Delimiter(RBrace)),
-        ',' => ','.value(Delimiter(Comma)),
-        ';' => ';'.value(Delimiter(Semicolon)),
-        '+' => '+'.value(BinOp(Add)),
-        '-' => '-'.value(BinOp(Sub)),
-        '*' => '*'.value(BinOp(Mul)),
-        '/' => '/'.value(BinOp(Div)),
-        '%' => '%'.value(BinOp(Mod)),
-        '=' => '='.value(BinOp(Assign)),
-        '>' => '>'.value(BinOp(Greater)),
-        '<' => '<'.value(BinOp(Less)),
-        '?' => '?'.value(TernaryOp(Then)),
-        ':' => ':'.value(TernaryOp(Else)),
+        '(' => '('.value(LParen),
+        ')' => ')'.value(RParen),
+        '[' => '['.value(LBracket),
+        ']' => ']'.value(RBracket),
+        '{' => '{'.value(LBrace),
+        '}'=> '}'.value(RBrace),
+        ',' => ','.value(Comma),
+        ';' => ';'.value(Semicolon),
+        '+' => '+'.value(Add),
+        '-' => '-'.value(Sub),
+        '*' => '*'.value(Mul),
+        '/' => '/'.value(Div),
+        '%' => '%'.value(Mod),
+        '=' => '='.value(Assign),
+        '>' => '>'.value(Greater),
+        '<' => '<'.value(Less),
+        '?' => '?'.value(Then),
+        ':' => ':'.value(Else),
         _ => fail,
     };
-    let pow = "**".value(BinOp(Pow));
-    let eq = "==".value(BinOp(Binary::Eq));
-    let neq = "!=".value(BinOp(Binary::NotEq));
-    let geq = ">=".value(BinOp(Binary::GreaterEq));
-    let leq = "<=".value(BinOp(Binary::LessEq));
-    let and = "&&".value(BinOp(Binary::And));
-    let or = "||".value(BinOp(Binary::Or));
-    let inc = "++".value(UnOp(Unary::Inc));
-    let dec = "--".value(UnOp(Unary::Dec));
-    let assign_add = "+=".value(BinOp(AssignAdd));
-    let assign_sub = "-=".value(BinOp(AssignSub));
-    let assign_mul = "*=".value(BinOp(AssignMul));
-    let assign_div = "/=".value(BinOp(AssignDiv));
+    let pow = "**".value(Pow);
+    let eq = "==".value(Eq);
+    let neq = "!=".value(NotEq);
+    let geq = ">=".value(GreaterEq);
+    let leq = "<=".value(LessEq);
+    let and = "&&".value(And);
+    let or = "||".value(Or);
+    let inc = "++".value(Inc);
+    let dec = "--".value(Dec);
+    let assign_add = "+=".value(AssignAdd);
+    let assign_sub = "-=".value(AssignSub);
+    let assign_mul = "*=".value(AssignMul);
+    let assign_div = "/=".value(AssignDiv);
     alt((
         assign_add, assign_div, assign_mul, assign_sub, inc, dec, and, or, eq, neq, geq, leq, pow,
         single, identifier,
@@ -166,7 +159,7 @@ fn identifier(i: &mut &str) -> PResult<Token> {
         "exp2" => Ok(Function(Exp2)),
         "log" => Ok(Function(Log)),
         "log2" => Ok(Function(Log2)),
-        "pow" => Ok(Function(Pow)),
+        "pow" => Ok(Function(FunctionName::Pow)),
         "sqrt" => Ok(Function(Sqrt)),
         "abs" => Ok(Function(Abs)),
         "sign" => Ok(Function(Sign)),
@@ -174,10 +167,10 @@ fn identifier(i: &mut &str) -> PResult<Token> {
         "ceil" => Ok(Function(Ceil)),
         "fract" => Ok(Function(Fract)),
         "FR" => Ok(Function(Fract)),
-        "mod" => Ok(Function(Mod)),
+        "mod" => Ok(Function(FunctionName::Mod)),
         "min" => Ok(Function(Min)),
         "max" => Ok(Function(Max)),
-        "clamp" => Ok(Function(Clamp)),
+        "cl" => Ok(Function(Clamp)),
         "mix" => Ok(Function(Mix)),
         "B" => Ok(Function(Abs)),
         "SM" => Ok(Function(Smoothstep)),
@@ -244,26 +237,26 @@ mod tests {
         let input = "s = G(x,y,z); t = rmin(x, y, s)";
         let expected = vec![
             Variable("s".to_string()),
-            BinOp(Binary::Assign),
+            Assign,
             Function(FunctionName::Intersect),
-            Delimiter(Delim::LParen),
+            LParen,
             Variable("x".to_string()),
-            Delimiter(Delim::Comma),
+            Comma,
             Variable("y".to_string()),
-            Delimiter(Delim::Comma),
+            Comma,
             Variable("z".to_string()),
-            Delimiter(Delim::RParen),
-            Delimiter(Delim::Semicolon),
+            RParen,
+            Semicolon,
             Variable("t".to_string()),
-            BinOp(Binary::Assign),
+            Assign,
             Function(FunctionName::RoundMin),
-            Delimiter(Delim::LParen),
+            LParen,
             Variable("x".to_string()),
-            Delimiter(Delim::Comma),
+            Comma,
             Variable("y".to_string()),
-            Delimiter(Delim::Comma),
+            Comma,
             Variable("s".to_string()),
-            Delimiter(Delim::RParen),
+            RParen,
         ];
         assert_eq!(lex.parse_peek(input), Ok(("", expected)));
     }
@@ -274,19 +267,19 @@ mod tests {
         let input = "variable0 = 1 + 2.8 * .3 - 4 / 5 % 6 ** 7";
         let expected = vec![
             Variable("variable0".to_string()),
-            BinOp(Binary::Assign),
+            Assign,
             ScalarVal(1.0),
-            BinOp(Binary::Add),
+            Add,
             ScalarVal(2.8),
-            BinOp(Binary::Mul),
+            Mul,
             ScalarVal(0.3),
-            BinOp(Binary::Sub),
+            Sub,
             ScalarVal(4.0),
-            BinOp(Binary::Div),
+            Div,
             ScalarVal(5.0),
-            BinOp(Binary::Mod),
+            Mod,
             ScalarVal(6.0),
-            BinOp(Binary::Pow),
+            Pow,
             ScalarVal(7.0),
         ];
         assert_eq!(lex.parse_peek(input), Ok(("", expected)));
