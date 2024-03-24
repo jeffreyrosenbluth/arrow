@@ -50,7 +50,7 @@ pub enum Op {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AssignOp {
-    Scalar,
+    Number,
     Add,
     Sub,
     Mul,
@@ -139,7 +139,7 @@ fn token(i: &mut &str) -> PResult<Token> {
         '-' => '-'.value(Operator(Op::Sub)),
         '*' => '*'.value(Operator(Op::Mul)),
         '/' => '/'.value(Operator(Op::Div)),
-        '=' => '='.value(Assign(AssignOp::Scalar)),
+        '=' => '='.value(Assign(AssignOp::Number)),
         '>' => '>'.value(Operator(Op::Greater)),
         '<' => '<'.value(Operator(Op::Less)),
         '?' => '?'.value(Then),
@@ -263,7 +263,7 @@ mod tests {
         let input = "s = G(x,y,z); t = rmin(x, y, s)";
         let expected = vec![
             Variable("s".to_string()),
-            Assign(AssignOp::Scalar),
+            Assign(AssignOp::Number),
             Function(FunctionName::Intersect),
             LParen,
             Variable("x".to_string()),
@@ -274,7 +274,7 @@ mod tests {
             RParen,
             Semicolon,
             Variable("t".to_string()),
-            Assign(AssignOp::Scalar),
+            Assign(AssignOp::Number),
             Function(FunctionName::RoundMin),
             LParen,
             Variable("x".to_string()),
@@ -294,7 +294,7 @@ mod tests {
         let input = "variable0 = 1 + 2.8 * .3 - 4 / 5 + 6 ** 7";
         let expected = vec![
             Variable("variable0".to_string()),
-            Assign(AssignOp::Scalar),
+            Assign(AssignOp::Number),
             ScalarVal(1.0),
             Operator(Add),
             ScalarVal(2.8),

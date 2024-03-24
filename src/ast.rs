@@ -9,7 +9,7 @@ pub enum Statement {
     Empty,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Expr {
     Number(f32),
     BinaryOp(BinOp),
@@ -21,7 +21,7 @@ pub enum Expr {
     Assign(AssignExpr),
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum BinOp {
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
@@ -38,7 +38,7 @@ pub enum BinOp {
     Pow(Box<Expr>, Box<Expr>),
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum AssignExpr {
     Inc(String),
     Dec(String),
