@@ -104,7 +104,7 @@ fn eval_expr(env: &mut Environment, ast: Box<Expr>) -> Value {
                 _ => panic!("negate expects scalar values"),
             }
         }
-        Expr::Scalar(value) => {
+        Expr::Number(value) => {
             let r = ScalarVal(value);
             env.insert("#".to_string(), r);
             r

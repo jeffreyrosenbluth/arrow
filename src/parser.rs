@@ -164,7 +164,7 @@ fn factor(i: &mut &[Token]) -> PResult<Expr> {
     let negation = opt(one_of(Token::Sub)).map(|op| op.is_some());
     let expression = alt((
         scalar,
-        assign,
+        assign_expr,
         function,
         variable.map(|s| Expr::Variable(s)),
         parens,
@@ -192,7 +192,7 @@ fn scalar(i: &mut &[Token]) -> PResult<Expr> {
         .parse_next(i)
 }
 
-fn assign(i: &mut &[Token]) -> PResult<Expr> {
+fn assign_expr(i: &mut &[Token]) -> PResult<Expr> {
     use AssignExpr::*;
     let var = variable.parse_next(i)?;
     let op = one_of([Token::Inc, Token::Dec]).parse_next(i)?;
@@ -393,8 +393,14 @@ mod tests {
         // let input = "a=U(1,2), b=L(x, y)";
         // let input = "don(x-cl(x,-15,15),y-18,z-20,10,3)";
         // let input = "don(x,y-18,z-20,10,3)";
-        // let input = " a = cl(x, -15, 15)";
-        let input = "s=20,[x,z]=r0(x,z)";
+        // let input = " a = cl(x, -15, 15)"
+        // let input = "@xyz{$m=mod($,20)-10,$i=Z($/20),}d=99,g1=.05,y-=20,[z,x]=r0(z,x),n=nz(x,y,z,.1,1),n1=nz(x,y,z,.3,2,3),@1{x-=20,o=$*200+20,e=B(y+n1/2+sin(z*.05+o)*10)-1,e=rG(e,B(z+sin(x*.05+o)*25)-5+n1*2,.2),@xz{$1=mod($+n*10,3)-1.5,}e=rG(e,-(B(z1)-g1),.25),e=rG(e,-(B(x1)-g1),.25),d=U(d,e),[x,z]=r1(z,x),y+=20,}U(d,ri(xi,yi,zi)>.4&&L(xi,yi,zi)>3?L(xm,ym,zm)-2:10)";
+        // let input = "s=20,[x,z]=r0(x,z)";
+        // let input = "j = x >= 3&&y < 2";
+        let input = "d=99, [y,z]=r1(y,z), f=y+B(nz(x,z,1,.0,3))*5, @5{ [x,y,z]=[y,z,x], [x,z]=r0(x,z), [x,z]=r1(x,z), @xyz{$=sB($,2)-3,} d=rU(d, don(y,z,x,5,.5+$*.2), 1), } rU(f, L(d,nz(x,y,z,.5,1))-.1, .5)";
+        // let input = "d=99, [y,z]=r1(y,z), f=y+B(nz(x,z,1,.0,3))*5, @1{@xyz{$=sB($,2)-3,} d=rU(d, don(y,z,x,5,.5+$*.2), 1), }"; //bu rU(f, L(d,nz(x,y,z,.5,1))-.1, .5)";
+        // let input = "@1{@xyz{$=sB($,2)-3,} d=rU(d, don(y,z,x,5,.5+$*.2), 1), }";
+        // let input = "@1{d=rU(d, don(y,z,x,5,.5+$*.2), 1) }";
         let mut i: &str = &expand(input);
         dbg!(&i);
         let l = lex(&mut i).unwrap();

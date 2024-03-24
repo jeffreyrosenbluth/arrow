@@ -13,32 +13,32 @@ const WIDTH: u32 = 1024 / S;
 const HEIGHT: u32 = 768 / S;
 
 fn main() {
-    use arrow::parser::*;
-    let background = 0.75;
-    let examples = examples();
-    let (mut input, pos) = *examples.get("else").unwrap();
-    let ast = parse(&mut input);
-    dbg!(&ast);
-    let sdf: Sdf = Box::new(move |p| make_sdf(&ast, 0.1, 0.2, p));
-    println!("sdf: {}", sdf(v3(0.0, 0.0, -50.0)));
+    // use arrow::parser::*;
+    // let background = 0.75;
+    // let examples = examples();
+    // let (mut input, pos) = *examples.get("temple").unwrap();
+    // let ast = parse(&mut input);
+    // dbg!(&ast);
+    // let sdf: Sdf = Box::new(move |p| make_sdf(&ast, 0.1, 0.2, p));
+    // println!("sdf: {}", sdf(v3(0.0, 0.0, -50.0)));
     // let plane = sd_plane(v3(0.0, 0.85, 0.3), 10.0, I);
     // let sdf = union(sdf, plane);
-    let img_data = render(
-        &sdf,
+    // let img_data = render(
+        // &sdf,
         // Camera position
-        pos,
+        // pos,
         // Look at
-        ZERO3,
-        &vec![
-            Light::new(v3(0.0, 0.0, -50.0), 1.5),
-            Light::new(v3(0.0, 10.0, 40.0), 1.0),
-        ],
-        background,
-        WIDTH,
-        HEIGHT,
-        1, // Anti-aliasing
-    );
-    image::save_buffer("hatch.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
+        // ZERO3,
+    //     &vec![
+    //         Light::new(v3(0.0, 0.0, -50.0), 1.5),
+    //         Light::new(v3(0.0, 10.0, 40.0), 1.0),
+    //     ],
+    //     background,
+    //     WIDTH,
+    //     HEIGHT,
+    //     1, // Anti-aliasing
+    // );
+    // image::save_buffer("hatch.png", &img_data, WIDTH, HEIGHT, image::ColorType::L8).unwrap();
 }
 
 fn examples<'a>() -> HashMap<&'a str, (&'a str, Vec3)> {
@@ -191,6 +191,13 @@ fn examples<'a>() -> HashMap<&'a str, (&'a str, Vec3)> {
         (
            "y-=1, r=bx3(x,y,z,9)-2,s=1,ti=U(L(x,y)-.6, L(y,z)-.6,L(z,x)-.6); @4{ @xyz{$=(mod($+9,18)-9)*3,} s/=3, r=k(r+s,-U(@xyz{L($,$$)-12,})*s)-s, } U(r, ti)",
             v3(0.0, 20.0, -20.0) 
+        )
+    );
+    examples.insert(
+        "temple",
+        (
+            "d=99, [y,z]=r1(y,z), f=y+B(nz(x,z,1,.0,3))*5, @5{ [x,y,z]=[y,z,x], [x,z]=r0(x,z), [x,z]=r1(x,z), @xyz{$=sB($,2)-3,} d=rU(d, don(y,z,x,5,.5+$*.2), 1), } rU(f, L(d,nz(x,y,z,.5,1))-.1, .5)",
+            v3(0.0, 0.0, -30.0)
         )
     );
     examples

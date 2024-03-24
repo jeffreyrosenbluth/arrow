@@ -11,7 +11,7 @@ pub enum Statement {
 
 #[derive(Debug, Clone, Serialize)]
 pub enum Expr {
-    Scalar(f32),
+    Number(f32),
     BinaryOp(BinOp),
     Negate(Box<Expr>),
     Paren(Box<Expr>),

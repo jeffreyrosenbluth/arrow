@@ -6,32 +6,13 @@ use winnow::{
 };
 
 use crate::ast::FunctionName;
+use crate::expand::expand;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     ScalarVal(f32),
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    Pow,
-    Eq,
-    NotEq,
-    Greater,
-    GreaterEq,
-    Less,
-    LessEq,
-    And,
-    Or,
-    Assign,
-    AssignAdd,
-    AssignSub,
-    AssignMul,
-    AssignDiv,
-    Not,
-    Inc,
-    Dec,
+    Operator(Op),
+    Assign(AssignOp),
     LParen,
     RParen,
     LBrace,
@@ -44,6 +25,36 @@ pub enum Token {
     Else,
     Variable(String),
     Function(FunctionName),
+    Eof,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Op {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Pow,
+    Eq,
+    NotEq,
+    Greater,
+    GreaterEq,
+    Less,
+    LessEq,
+    And,
+    Or,
+    Not,
+    Inc,
+    Dec,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum AssignOp {
+    Scalar,
+    Add,
+    Sub,
+    Mul,
+    Div,
 }
 
 impl core::fmt::Display for Token {
@@ -56,12 +67,6 @@ impl core::fmt::Display for Token {
             a => write!(f, "{:?}", a),
         }
     }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Ternary {
-    Then,
-    Else,
 }
 
 impl winnow::stream::ContainsToken<Token> for Token {
@@ -96,6 +101,27 @@ pub fn lex(i: &mut &str) -> PResult<Vec<Token>> {
     preceded(multispace0, repeat(1.., terminated(token, multispace0))).parse_next(i)
 }
 
+pub struct Lexer {
+    pub tokens: Vec<Token>,
+}
+
+impl Lexer {
+    pub fn new(input: &mut &str) -> Self {
+        let mut i_str: &str = &expand(input);
+        let mut tokens = lex(&mut i_str).expect("lexer failed");
+        tokens.reverse();
+        Lexer { tokens }
+    }
+
+    pub fn next(&mut self) -> Token {
+        self.tokens.pop().unwrap_or(Token::Eof)
+    }
+
+    pub fn peek(&mut self) -> Token {
+        self.tokens.last().cloned().unwrap_or(Token::Eof)
+    }
+}
+
 fn token(i: &mut &str) -> PResult<Token> {
     use Token::*;
     let single = dispatch! {peek(any);
@@ -109,31 +135,30 @@ fn token(i: &mut &str) -> PResult<Token> {
         '}'=> '}'.value(RBrace),
         ',' => ','.value(Comma),
         ';' => ';'.value(Semicolon),
-        '+' => '+'.value(Add),
-        '-' => '-'.value(Sub),
-        '*' => '*'.value(Mul),
-        '/' => '/'.value(Div),
-        '%' => '%'.value(Mod),
-        '=' => '='.value(Assign),
-        '>' => '>'.value(Greater),
-        '<' => '<'.value(Less),
+        '+' => '+'.value(Operator(Op::Add)),
+        '-' => '-'.value(Operator(Op::Sub)),
+        '*' => '*'.value(Operator(Op::Mul)),
+        '/' => '/'.value(Operator(Op::Div)),
+        '=' => '='.value(Assign(AssignOp::Scalar)),
+        '>' => '>'.value(Operator(Op::Greater)),
+        '<' => '<'.value(Operator(Op::Less)),
         '?' => '?'.value(Then),
         ':' => ':'.value(Else),
         _ => fail,
     };
-    let pow = "**".value(Pow);
-    let eq = "==".value(Eq);
-    let neq = "!=".value(NotEq);
-    let geq = ">=".value(GreaterEq);
-    let leq = "<=".value(LessEq);
-    let and = "&&".value(And);
-    let or = "||".value(Or);
-    let inc = "++".value(Inc);
-    let dec = "--".value(Dec);
-    let assign_add = "+=".value(AssignAdd);
-    let assign_sub = "-=".value(AssignSub);
-    let assign_mul = "*=".value(AssignMul);
-    let assign_div = "/=".value(AssignDiv);
+    let pow = "**".value(Operator(Op::Pow));
+    let eq = "==".value(Operator(Op::Eq));
+    let neq = "!=".value(Operator(Op::NotEq));
+    let geq = ">=".value(Operator(Op::GreaterEq));
+    let leq = "<=".value(Operator(Op::LessEq));
+    let and = "&&".value(Operator(Op::And));
+    let or = "||".value(Operator(Op::Or));
+    let inc = "++".value(Operator(Op::Inc));
+    let dec = "--".value(Operator(Op::Dec));
+    let assign_add = "+=".value(Assign(AssignOp::Add));
+    let assign_sub = "-=".value(Assign(AssignOp::Sub));
+    let assign_mul = "*=".value(Assign(AssignOp::Mul));
+    let assign_div = "/=".value(Assign(AssignOp::Div));
     alt((
         assign_add, assign_div, assign_mul, assign_sub, inc, dec, and, or, eq, neq, geq, leq, pow,
         single, identifier,
@@ -218,10 +243,10 @@ fn identifier(i: &mut &str) -> PResult<Token> {
     }
 }
 
+#[cfg(test)]
+
 mod tests {
     use super::*;
-    use crate::ast::*;
-    use crate::expand::expand;
 
     #[test]
     fn show() {
@@ -231,13 +256,14 @@ mod tests {
         let i = expand(input);
         let _ = dbg!(lex.parse_peek(&i));
     }
+
     #[test]
     fn test_function() {
         use Token::*;
         let input = "s = G(x,y,z); t = rmin(x, y, s)";
         let expected = vec![
             Variable("s".to_string()),
-            Assign,
+            Assign(AssignOp::Scalar),
             Function(FunctionName::Intersect),
             LParen,
             Variable("x".to_string()),
@@ -248,7 +274,7 @@ mod tests {
             RParen,
             Semicolon,
             Variable("t".to_string()),
-            Assign,
+            Assign(AssignOp::Scalar),
             Function(FunctionName::RoundMin),
             LParen,
             Variable("x".to_string()),
@@ -263,23 +289,24 @@ mod tests {
 
     #[test]
     fn test_assign() {
+        use Op::*;
         use Token::*;
-        let input = "variable0 = 1 + 2.8 * .3 - 4 / 5 % 6 ** 7";
+        let input = "variable0 = 1 + 2.8 * .3 - 4 / 5 + 6 ** 7";
         let expected = vec![
             Variable("variable0".to_string()),
-            Assign,
+            Assign(AssignOp::Scalar),
             ScalarVal(1.0),
-            Add,
+            Operator(Add),
             ScalarVal(2.8),
-            Mul,
+            Operator(Mul),
             ScalarVal(0.3),
-            Sub,
+            Operator(Sub),
             ScalarVal(4.0),
-            Div,
+            Operator(Div),
             ScalarVal(5.0),
-            Mod,
+            Operator(Add),
             ScalarVal(6.0),
-            Pow,
+            Operator(Pow),
             ScalarVal(7.0),
         ];
         assert_eq!(lex.parse_peek(input), Ok(("", expected)));
