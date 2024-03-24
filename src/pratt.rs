@@ -91,41 +91,23 @@ fn assign(lhs: Token, lexer: &mut Lexer) -> Statement {
         _ => unreachable!(),
     };
     let token = lexer.next();
-    let rhs = expr(None, lexer);
+    let mut rhs = Box::new(expr(None, lexer));
     match token {
-        Token::Assign(AssignOp::Number) => Statement::Assign {
-            var: v.clone(),
-            rhs: Box::new(rhs),
-        },
-        Token::Assign(AssignOp::Add) => Statement::Assign {
-            var: v.clone(),
-            rhs: Box::new(Expr::BinaryOp(BinOp::Add(
-                Box::new(Expr::Variable(v.clone())),
-                Box::new(rhs),
-            ))),
-        },
-        Token::Assign(AssignOp::Sub) => Statement::Assign {
-            var: v.clone(),
-            rhs: Box::new(Expr::BinaryOp(BinOp::Sub(
-                Box::new(Expr::Variable(v.clone())),
-                Box::new(rhs),
-            ))),
-        },
-        Token::Assign(AssignOp::Mul) => Statement::Assign {
-            var: v.clone(),
-            rhs: Box::new(Expr::BinaryOp(BinOp::Mul(
-                Box::new(Expr::Variable(v.clone())),
-                Box::new(rhs),
-            ))),
-        },
-        Token::Assign(AssignOp::Div) => Statement::Assign {
-            var: v.clone(),
-            rhs: Box::new(Expr::BinaryOp(BinOp::Div(
-                Box::new(Expr::Variable(v.clone())),
-                Box::new(rhs),
-            ))),
-        },
+        Token::Assign(a) => {
+            let var = Box::new(Expr::Variable(v.clone()));
+            rhs = match a {
+                AssignOp::Number => rhs,
+                AssignOp::Add => Box::new(Expr::BinaryOp(BinOp::Add(var, rhs))),
+                AssignOp::Sub => Box::new(Expr::BinaryOp(BinOp::Sub(var, rhs))),
+                AssignOp::Mul => Box::new(Expr::BinaryOp(BinOp::Mul(var, rhs))),
+                AssignOp::Div => Box::new(Expr::BinaryOp(BinOp::Div(var, rhs))),
+            }
+        }
         t => panic!("bad token: {:?}", t),
+    }
+    Statement::Assign {
+        var: v.clone(),
+        rhs,
     }
 }
 
@@ -156,6 +138,13 @@ fn expr_bp(token: Option<Token>, lexer: &mut Lexer, min_bp: u8) -> Expr {
             assert_eq!(lexer.next(), Token::LParen);
             let mut args = Vec::new();
             loop {
+                if lexer.peek() == Token::LBracket {
+                    lexer.next();
+                }
+                if lexer.peek() == Token::RParen {
+                    lexer.next();
+                    break;
+                }
                 args.push(expr(None, lexer));
                 match lexer.next() {
                     Token::RParen => break,
@@ -163,6 +152,11 @@ fn expr_bp(token: Option<Token>, lexer: &mut Lexer, min_bp: u8) -> Expr {
                         if lexer.peek() == Token::RParen {
                             lexer.next();
                             break;
+                        }
+                    }
+                    Token::RBracket => {
+                        if lexer.peek() == Token::Comma {
+                            lexer.next();
                         }
                     }
                     t => panic!("bad token: {:?}", t),

@@ -1,7 +1,7 @@
 use arrow::ast::Statement;
 use arrow::core::v3;
 use arrow::eval::{eval, Value};
-use arrow::parser::parse;
+use arrow::pratt::parse;
 use glam::Vec3;
 use std::collections::HashMap;
 

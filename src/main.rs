@@ -16,7 +16,7 @@ fn main() {
     use arrow::pratt::*;
     let background = 0.75;
     let examples = examples();
-    let (mut input, pos) = *examples.get("else").unwrap();
+    let (mut input, pos) = *examples.get("apollonius").unwrap();
     let ast = parse(&mut input);
     dbg!(&ast);
     let sdf: Sdf = Box::new(move |p| make_sdf(&ast, 0.1, 0.2, p));
