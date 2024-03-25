@@ -125,7 +125,9 @@ fn eval_expr(env: &mut Environment, ast: Box<Expr>) -> Value {
             r
         }
         Expr::Variable(name) => {
-            let value = *env.get(&name).expect("variable not found");
+            let value = *env
+                .get(&name)
+                .expect(format!("variable not found: {}", name).as_str());
             env.insert("#".to_string(), value);
             value
         }
