@@ -3,7 +3,8 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 pub enum Statement {
     Assign { var: String, rhs: Box<Expr> },
-    AssignArray { vars: Vec<String>, rhs: Box<Expr> },
+    AssignToArray { vars: Vec<String>, rhs: Box<Expr> },
+    AssignFromArray { vars: Vec<String>, rhs: Vec<Expr> },
     Sequence(Vec<Statement>),
     Return(Box<Expr>),
     Empty,
@@ -14,7 +15,6 @@ pub enum Expr {
     Number(f32),
     BinaryOp(BinOp),
     Negate(Box<Expr>),
-    Paren(Box<Expr>),
     Function { name: FunctionName, args: Vec<Expr> },
     Variable(String),
     TernaryOp(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -104,6 +104,3 @@ pub enum FunctionName {
     FakeSine,
     Hash,
 }
-
-#[derive(Debug, Clone, Serialize)]
-pub enum Function3Name {}

@@ -61,12 +61,12 @@ pub fn eval(env: &mut Environment, ast: &Statement, v: Vec3) {
     if !env.contains_key("z") {
         env.insert("z".to_string(), ScalarVal(v.z));
     }
-    match &ast {
+    match ast {
         Statement::Assign { var, rhs } => {
             let r = eval_expr(env, rhs.clone());
             env.insert(var.clone(), r);
         }
-        Statement::AssignArray { vars, rhs } => {
+        Statement::AssignToArray { vars, rhs } => {
             let value = eval_expr(env, rhs.clone());
             match value {
                 Vec2Val(v) => {
@@ -80,6 +80,16 @@ pub fn eval(env: &mut Environment, ast: &Statement, v: Vec3) {
                     env.insert(vars[1].clone(), ScalarVal(v.y));
                     env.insert(vars[2].clone(), ScalarVal(v.z));
                 }
+            }
+        }
+        Statement::AssignFromArray { vars, rhs } => {
+            assert_eq!(vars.len(), rhs.len());
+            let values: Vec<Value> = rhs
+                .iter()
+                .map(|r| eval_expr(env, Box::new(r.clone())))
+                .collect();
+            for var in vars.iter().zip(values.iter()) {
+                env.insert(var.0.clone(), var.1.clone());
             }
         }
         Statement::Sequence(stmts) => {
@@ -111,11 +121,6 @@ fn eval_expr(env: &mut Environment, ast: Box<Expr>) -> Value {
         }
         Expr::BinaryOp(op) => {
             let r = eval_binop(env, op);
-            env.insert("#".to_string(), r);
-            r
-        }
-        Expr::Paren(expr) => {
-            let r = eval_expr(env, expr);
             env.insert("#".to_string(), r);
             r
         }

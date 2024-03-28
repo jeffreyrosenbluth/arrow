@@ -29,25 +29,8 @@ fn statement(lexer: &mut Lexer) -> Statement {
             let op = lexer.peek();
             match op {
                 Token::Assign(_) => assign(lhs, lexer),
-                Token::Operator(Op::Inc) => {
-                    _ = lexer.next();
-                    Statement::Assign {
-                        var: var.to_string(),
-                        rhs: Box::new(Expr::BinaryOp(BinOp::Add(
-                            Box::new(Expr::Variable(var.to_string())),
-                            Box::new(Expr::Number(1.0)),
-                        ))),
-                    }
-                }
-                Token::Operator(Op::Dec) => {
-                    _ = lexer.next();
-                    Statement::Assign {
-                        var: var.to_string(),
-                        rhs: Box::new(Expr::BinaryOp(BinOp::Sub(
-                            Box::new(Expr::Variable(var.to_string())),
-                            Box::new(Expr::Number(1.0)),
-                        ))),
-                    }
+                Token::Operator(op) if op == Op::Inc || op == Op::Dec => {
+                    op_statement(var.to_string(), op, lexer)
                 }
                 _ => {
                     let e = expr(Some(lhs), lexer);
@@ -56,25 +39,31 @@ fn statement(lexer: &mut Lexer) -> Statement {
             }
         }
         Token::LBracket => {
-            let mut vars = Vec::new();
-            let mut token = lexer.next();
-            loop {
-                if let Token::Variable(v) = token {
-                    vars.push(v);
-                    token = lexer.next();
-                    if token == Token::RBracket {
+            let vars = var_list(lexer);
+            let token = lexer.next();
+            assert_eq!(token, Token::Assign(AssignOp::Number));
+            if let Token::LBracket = lexer.peek() {
+                lexer.next();
+                let mut rhs = Vec::new();
+                loop {
+                    if lexer.peek() == Token::RBracket {
+                        lexer.next();
                         break;
                     }
-                    assert_eq!(token, Token::Comma);
-                    token = lexer.next();
+                    rhs.push(expr(None, lexer));
+                    match lexer.next() {
+                        Token::Comma => {}
+                        Token::RBracket => break,
+                        t => panic!("bad token: {:?}", t),
+                    }
                 }
-            }
-            token = lexer.next();
-            assert_eq!(token, Token::Assign(AssignOp::Number));
-            let rhs = expr(None, lexer);
-            Statement::AssignArray {
-                vars,
-                rhs: Box::new(rhs),
+                Statement::AssignFromArray { vars, rhs }
+            } else {
+                let rhs = expr(None, lexer);
+                Statement::AssignToArray {
+                    vars,
+                    rhs: Box::new(rhs),
+                }
             }
         }
         _ => {
@@ -111,6 +100,48 @@ fn assign(lhs: Token, lexer: &mut Lexer) -> Statement {
     }
 }
 
+fn op_statement(var: String, op: Op, lexer: &mut Lexer) -> Statement {
+    match op {
+        Op::Inc => {
+            _ = lexer.next();
+            Statement::Assign {
+                var: var.to_string(),
+                rhs: Box::new(Expr::BinaryOp(BinOp::Add(
+                    Box::new(Expr::Variable(var.to_string())),
+                    Box::new(Expr::Number(1.0)),
+                ))),
+            }
+        }
+        Op::Dec => {
+            _ = lexer.next();
+            Statement::Assign {
+                var: var.to_string(),
+                rhs: Box::new(Expr::BinaryOp(BinOp::Sub(
+                    Box::new(Expr::Variable(var.to_string())),
+                    Box::new(Expr::Number(1.0)),
+                ))),
+            }
+        }
+        _ => unreachable!("op: {:?} slipped through", op),
+    }
+}
+
+fn var_list(lexer: &mut Lexer) -> Vec<String> {
+    let mut vars = Vec::new();
+    loop {
+        let mut token = lexer.next();
+        if let Token::Variable(v) = token {
+            vars.push(v);
+            token = lexer.next();
+            if token == Token::RBracket {
+                break;
+            }
+            assert_eq!(token, Token::Comma);
+        }
+    }
+    vars
+}
+
 fn expr(token: Option<Token>, lexer: &mut Lexer) -> Expr {
     expr_bp(token, lexer, 0)
 }
@@ -123,7 +154,7 @@ fn expr_bp(token: Option<Token>, lexer: &mut Lexer, min_bp: u8) -> Expr {
         Token::LParen => {
             let lhs = expr(None, lexer);
             assert_eq!(lexer.next(), Token::RParen);
-            Expr::Paren(Box::new(lhs))
+            lhs
         }
         Token::Operator(op) => {
             let r_bp = prefix_binding_power(Token::Operator(op));
@@ -271,7 +302,7 @@ mod tests {
 
     #[test]
     fn show() {
-        let mut i = "(((3.1415)))";
+        let mut i = "[x,y,z] = [y, z, x]";
         let s = parse(&mut i);
         dbg!(s);
     }
@@ -348,7 +379,7 @@ mod tests {
     #[test]
     fn quanta() {
         let mut i = "s=20,[x,z]=r0(x,z),[y,x]=r1(y,x),z+=17,y+=27,i=0,z+=ri(Z(x/s))*70,@xz{$-=nz(x,y,z,.1,i++)*5*i,$i=Z($/s),$=mod($,s)-s/2,}i=ri(xi,zi),j=ri(xi,floor(y/5)),d=i>.1?rU(L(x,z)-1*i-.5*(cos(y/4)+1),bx2(L(x,z)-(cos(floor(y/4))+1)*2,mod(y,4)-2,.1,.2)-.05,1):L(x,mod(y,5)-2.5,z)-G(j,0)*2";
-        let expected = String::from("Sequence([Assign { var: \"s\", rhs: Number(20.0) }, AssignArray { vars: [\"x\", \"z\"], rhs: Function { name: Rot0, args: [Variable(\"x\"), Variable(\"z\")] } }, AssignArray { vars: [\"y\", \"x\"], rhs: Function { name: Rot1, args: [Variable(\"y\"), Variable(\"x\")] } }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), Number(17.0))) }, Assign { var: \"y\", rhs: BinaryOp(Add(Variable(\"y\"), Number(27.0))) }, Assign { var: \"i\", rhs: Number(0.0) }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), BinaryOp(Mul(Function { name: Hash, args: [Function { name: Floor, args: [BinaryOp(Div(Variable(\"x\"), Variable(\"s\")))] }] }, Number(70.0))))) }, Assign { var: \"x\", rhs: BinaryOp(Sub(Variable(\"x\"), BinaryOp(Mul(BinaryOp(Mul(Function { name: ValueNoise, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\"), Number(0.1), Assign(Inc(\"i\"))] }, Number(5.0))), Variable(\"i\"))))) }, Assign { var: \"xi\", rhs: Function { name: Floor, args: [BinaryOp(Div(Variable(\"x\"), Variable(\"s\")))] } }, Assign { var: \"x\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"x\"), Variable(\"s\")] }, BinaryOp(Div(Variable(\"s\"), Number(2.0))))) }, Assign { var: \"z\", rhs: BinaryOp(Sub(Variable(\"z\"), BinaryOp(Mul(BinaryOp(Mul(Function { name: ValueNoise, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\"), Number(0.1), Assign(Inc(\"i\"))] }, Number(5.0))), Variable(\"i\"))))) }, Assign { var: \"zi\", rhs: Function { name: Floor, args: [BinaryOp(Div(Variable(\"z\"), Variable(\"s\")))] } }, Assign { var: \"z\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"z\"), Variable(\"s\")] }, BinaryOp(Div(Variable(\"s\"), Number(2.0))))) }, Assign { var: \"i\", rhs: Function { name: Hash, args: [Variable(\"xi\"), Variable(\"zi\")] } }, Assign { var: \"j\", rhs: Function { name: Hash, args: [Variable(\"xi\"), Function { name: Floor, args: [BinaryOp(Div(Variable(\"y\"), Number(5.0)))] }] } }, Assign { var: \"d\", rhs: TernaryOp(BinaryOp(Greater(Variable(\"i\"), Number(0.1))), Function { name: RoundMin, args: [BinaryOp(Sub(BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), Variable(\"z\")] }, BinaryOp(Mul(Number(1.0), Variable(\"i\"))))), BinaryOp(Mul(Number(0.5), Paren(BinaryOp(Add(Function { name: Cos, args: [BinaryOp(Div(Variable(\"y\"), Number(4.0)))] }, Number(1.0)))))))), BinaryOp(Sub(Function { name: Box2, args: [BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), Variable(\"z\")] }, BinaryOp(Mul(Paren(BinaryOp(Add(Function { name: Cos, args: [Function { name: Floor, args: [BinaryOp(Div(Variable(\"y\"), Number(4.0)))] }] }, Number(1.0)))), Number(2.0))))), BinaryOp(Sub(Function { name: Mod, args: [Variable(\"y\"), Number(4.0)] }, Number(2.0))), Number(0.1), Number(0.2)] }, Number(0.05))), Number(1.0)] }, BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), BinaryOp(Sub(Function { name: Mod, args: [Variable(\"y\"), Number(5.0)] }, Number(2.5))), Variable(\"z\")] }, BinaryOp(Mul(Function { name: Intersect, args: [Variable(\"j\"), Number(0.0)] }, Number(2.0)))))) }])");
+        let expected = String::from("Sequence([Assign { var: \"s\", rhs: Number(20.0) }, AssignToArray { vars: [\"x\", \"z\"], rhs: Function { name: Rot0, args: [Variable(\"x\"), Variable(\"z\")] } }, AssignToArray { vars: [\"y\", \"x\"], rhs: Function { name: Rot1, args: [Variable(\"y\"), Variable(\"x\")] } }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), Number(17.0))) }, Assign { var: \"y\", rhs: BinaryOp(Add(Variable(\"y\"), Number(27.0))) }, Assign { var: \"i\", rhs: Number(0.0) }, Assign { var: \"z\", rhs: BinaryOp(Add(Variable(\"z\"), BinaryOp(Mul(Function { name: Hash, args: [Function { name: Floor, args: [BinaryOp(Div(Variable(\"x\"), Variable(\"s\")))] }] }, Number(70.0))))) }, Assign { var: \"x\", rhs: BinaryOp(Sub(Variable(\"x\"), BinaryOp(Mul(BinaryOp(Mul(Function { name: ValueNoise, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\"), Number(0.1), Assign(Inc(\"i\"))] }, Number(5.0))), Variable(\"i\"))))) }, Assign { var: \"xi\", rhs: Function { name: Floor, args: [BinaryOp(Div(Variable(\"x\"), Variable(\"s\")))] } }, Assign { var: \"x\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"x\"), Variable(\"s\")] }, BinaryOp(Div(Variable(\"s\"), Number(2.0))))) }, Assign { var: \"z\", rhs: BinaryOp(Sub(Variable(\"z\"), BinaryOp(Mul(BinaryOp(Mul(Function { name: ValueNoise, args: [Variable(\"x\"), Variable(\"y\"), Variable(\"z\"), Number(0.1), Assign(Inc(\"i\"))] }, Number(5.0))), Variable(\"i\"))))) }, Assign { var: \"zi\", rhs: Function { name: Floor, args: [BinaryOp(Div(Variable(\"z\"), Variable(\"s\")))] } }, Assign { var: \"z\", rhs: BinaryOp(Sub(Function { name: Mod, args: [Variable(\"z\"), Variable(\"s\")] }, BinaryOp(Div(Variable(\"s\"), Number(2.0))))) }, Assign { var: \"i\", rhs: Function { name: Hash, args: [Variable(\"xi\"), Variable(\"zi\")] } }, Assign { var: \"j\", rhs: Function { name: Hash, args: [Variable(\"xi\"), Function { name: Floor, args: [BinaryOp(Div(Variable(\"y\"), Number(5.0)))] }] } }, Assign { var: \"d\", rhs: TernaryOp(BinaryOp(Greater(Variable(\"i\"), Number(0.1))), Function { name: RoundMin, args: [BinaryOp(Sub(BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), Variable(\"z\")] }, BinaryOp(Mul(Number(1.0), Variable(\"i\"))))), BinaryOp(Mul(Number(0.5), BinaryOp(Add(Function { name: Cos, args: [BinaryOp(Div(Variable(\"y\"), Number(4.0)))] }, Number(1.0))))))), BinaryOp(Sub(Function { name: Box2, args: [BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), Variable(\"z\")] }, BinaryOp(Mul(BinaryOp(Add(Function { name: Cos, args: [Function { name: Floor, args: [BinaryOp(Div(Variable(\"y\"), Number(4.0)))] }] }, Number(1.0))), Number(2.0))))), BinaryOp(Sub(Function { name: Mod, args: [Variable(\"y\"), Number(4.0)] }, Number(2.0))), Number(0.1), Number(0.2)] }, Number(0.05))), Number(1.0)] }, BinaryOp(Sub(Function { name: Length, args: [Variable(\"x\"), BinaryOp(Sub(Function { name: Mod, args: [Variable(\"y\"), Number(5.0)] }, Number(2.5))), Variable(\"z\")] }, BinaryOp(Mul(Function { name: Intersect, args: [Variable(\"j\"), Number(0.0)] }, Number(2.0)))))) }])");
         let s = parse(&mut i);
         let result = format!("{s:?}");
         assert_eq!(result, expected);

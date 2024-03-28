@@ -245,7 +245,7 @@ pub fn examples<'a>() -> HashMap<&'a str, (&'a str, Vec3)> {
         "temple",
         (
             "d=99, [y,z]=r1(y,z), f=y+B(nz(x,z,1,.0,3))*5, @5{ [x,y,z]=[y,z,x], [x,z]=r0(x,z), [x,z]=r1(x,z), @xyz{$=sB($,2)-3,} d=rU(d, don(y,z,x,5,.5+$*.2), 1), } rU(f, L(d,nz(x,y,z,.5,1))-.1, .5)",
-            v3(0.0, 0.0, -30.0)
+            v3(0.0, 0.0, -35.0)
         )
     );
     examples.insert(
@@ -260,6 +260,13 @@ pub fn examples<'a>() -> HashMap<&'a str, (&'a str, Vec3)> {
         (
             "PI = 3.1415, [z,y]=r0(z,y), z=z+10, r=Math.sqrt(x * x + y * y), t=Math.atan2(y, x)/(2*PI), d=1e4, @20{ d=min(bx3(r-2*$,t,z,0.8,1,floor(mod($*1.2+t* mix(1,200,Math.pow(ri($,$,$)+.5,2)),3))>0?-1:1)-.2,d), } min(d,-z+nz(x,y,x,.1,1)*2)",
             v3(0.0, -20.0, -30.0)
+        )
+    );
+    examples.insert(
+        "ghost",
+        (
+            "y-=9.8, [x,z]=r0(x,z),a=x,b=y,c=B(z)-.3, [a,b]=rot(a,b,cos(.17),sin(.17)), an=Z(.5+atan2(b,a)/a1)*a1,[a,b]=rot(a,b,cos(an),sin(an)),d=G(U(bx3(a-7,b,c,.01,2,.01)-.05,bx3(b,a,c,.02,7,.02)-.01,L(a-7,b)-.4,L(mod(cl(a,0,5),1)-.5,b)-.05,),B(z)-.3),a=B(x),b=y,an=.3,[a,b]=rot(a,b,cos(an),sin(an)),d=U(G(U(d,L(x,y)-.2,L(a,c-.3)-.1),B(z)-.7), B(y+10)-2-sin(x*0.1)), t=(8*Z(x/8)+4),h=20-sin(t)*10, U(d,rU(G(bx3(x-t,y+h*.5,z+70,3,h,3), -bx3(B(x-t)-1.5,mod(y,3)-1.5,z+68,.8,h*0.04,2)), L(y+9,z+65)-.5+nz(x,y,z,5,1)*10, 2))",
+            v3(-10.0, 20.0, -1.0)
         )
     );
     examples

@@ -15,10 +15,10 @@ fn main() {
     use arrow::pratt::*;
     let background = 0.75;
     let examples = examples();
-    let (mut input, pos) = *examples.get("system").unwrap();
+    let (mut input, pos) = *examples.get("ghost").unwrap();
     let ast = parse(&mut input);
     dbg!(&ast);
-    let sdf: Sdf = Box::new(move |p| make_sdf(&ast, 0.1, 0.2, p));
+    let sdf: Sdf = Box::new(move |p| make_sdf(&ast, 0.2, 0.4, p));
     println!("sdf: {}", sdf(v3(0.0, 0.0, -50.0)));
     // let plane = sd_plane(v3(0.0, 0.85, 0.3), 10.0, I);
     // let sdf = union(sdf, plane);
