@@ -567,7 +567,13 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                     ScalarVal(arg3),
                     ScalarVal(arg4),
                     ScalarVal(arg5),
-                ) => ScalarVal(Vec3::new(arg0, arg1, arg2).distance(Vec3::new(arg3, arg4, arg5))),
+                ) => {
+                    if args.len() > 4 {
+                        ScalarVal(Vec3::new(arg0, arg1, arg2).distance(Vec3::new(arg3, arg4, arg5)))
+                    } else {
+                        ScalarVal(Vec2::new(arg0, arg1).distance(Vec2::new(arg2, arg3)))
+                    }
+                }
                 _ => panic!("distance expects scalar values"),
             }
         }
@@ -592,7 +598,13 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                     ScalarVal(arg3),
                     ScalarVal(arg4),
                     ScalarVal(arg5),
-                ) => ScalarVal(Vec3::new(arg0, arg1, arg2).dot(Vec3::new(arg3, arg4, arg5))),
+                ) => {
+                    if args.len() > 4 {
+                        ScalarVal(Vec3::new(arg0, arg1, arg2).dot(Vec3::new(arg3, arg4, arg5)))
+                    } else {
+                        ScalarVal(Vec2::new(arg0, arg1).dot(Vec2::new(arg2, arg3)))
+                    }
+                }
                 _ => panic!("dot expects scalar values"),
             }
         }

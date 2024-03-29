@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::ast::{AssignExpr, BinOp, Expr, FunctionName, Statement};
 use pretty::RcDoc;
 
@@ -9,6 +7,8 @@ pub fn generate_code(ast: &Statement) -> String {
         .append(RcDoc::text("use arrow::functions::*;"))
         .append(RcDoc::line())
         .append(RcDoc::text("let Vec3 {x, y, z} = p;"))
+        .append(RcDoc::line())
+        .append(RcDoc::text("let (a0, a1) = (0.1, 0.2);"))
         .append(RcDoc::line())
         .append(ast.to_doc())
         .append(RcDoc::line())
@@ -88,13 +88,34 @@ impl Expr {
             Expr::Number(n) => RcDoc::as_string(format!("{}f32", n)),
             Expr::BinaryOp(ref op) => op.to_doc(precedence),
             Expr::Negate(ref e) => RcDoc::text("-").append(e.to_doc(precedence)),
-            Expr::Function { ref name, ref args } => {
-                let mut doc = name.to_doc().append(RcDoc::text("("));
+            Expr::Function { ref name, ref args }
+                if *name == FunctionName::Union
+                    || *name == FunctionName::RoundMin
+                    || *name == FunctionName::Intersect
+                    || *name == FunctionName::RoundMax =>
+            {
+                let mut doc = name.to_doc().append(RcDoc::text("(vec!["));
                 for (i, arg) in args.iter().enumerate() {
-                    doc = doc.append(arg.to_doc(precedence));
+                    doc = doc.append(arg.to_doc(0));
                     if i < args.len() - 1 {
                         doc = doc.append(RcDoc::text(", "));
                     }
+                }
+                doc.append(RcDoc::text("])"))
+            }
+            Expr::Function { ref name, ref args } => {
+                let mut doc = name.to_doc().append(RcDoc::text("("));
+                for (i, arg) in args.iter().enumerate() {
+                    doc = doc.append(arg.to_doc(0));
+                    if i < args.len() - 1 {
+                        doc = doc.append(RcDoc::text(", "));
+                    }
+                }
+                if args.len() < 3 && *name == FunctionName::Length {
+                    doc = doc.append(RcDoc::text(", 0.0"));
+                }
+                if args.len() < 6 && *name == FunctionName::ValueNoise {
+                    doc = doc.append(RcDoc::text(", 1.0"));
                 }
                 doc.append(RcDoc::text(")"))
             }

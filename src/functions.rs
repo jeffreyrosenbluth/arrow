@@ -144,11 +144,18 @@ pub fn length(x: f32, y: f32, z: f32) -> f32 {
 }
 
 pub fn distance(x1: f32, y1: f32, z1: f32, x2: f32, y2: f32, z2: f32) -> f32 {
-    v3(x1, y1, z1).distance(v3(x2, y2, z2))
+    if y1 == 0.0 && z2 == 0.0 {
+        Vec2::new(x1, y1).distance(Vec2::new(z1, x2))
+    } else {
+        v3(x1, y1, z1).distance(v3(x2, y2, z2))
+    }
 }
-
 pub fn dot(x1: f32, y1: f32, z1: f32, x2: f32, y2: f32, z2: f32) -> f32 {
-    v3(x1, y1, z1).dot(v3(x2, y2, z2))
+    if y1 == 0.0 && z2 == 0.0 {
+        Vec2::new(x1, y1).dot(Vec2::new(z1, x2))
+    } else {
+        v3(x1, y1, z1).dot(v3(x2, y2, z2))
+    }
 }
 
 pub fn cross(x1: f32, y1: f32, z1: f32, x2: f32, y2: f32, z2: f32) -> Vec3 {
@@ -271,8 +278,8 @@ pub fn rot1(x: f32, y: f32) -> [f32; 2] {
     [result.x, result.y]
 }
 
-pub fn rot(x: f32, y: f32, c: f32, s: f32) -> Vec2 {
-    Vec2::new(c * x + s * y, c * y - s * x)
+pub fn rot(x: f32, y: f32, c: f32, s: f32) -> [f32; 2] {
+    [c * x + s * y, c * y - s * x]
 }
 
 pub fn triangle(x: f32) -> f32 {
