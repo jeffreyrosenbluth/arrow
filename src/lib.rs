@@ -3,6 +3,7 @@ pub mod codegen;
 pub mod core;
 pub mod eval;
 pub mod expand;
+pub mod functions;
 pub mod lexer;
 pub mod march;
 pub mod pratt;
