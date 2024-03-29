@@ -238,7 +238,7 @@ pub fn hash(x: f32, y: f32, z: f32) -> f32 {
     crate::core::hash(v3(x, y, z))
 }
 
-pub fn bx2(x: f32, y: f32, a: f32, b: f32) -> f32 {
+pub fn box2(x: f32, y: f32, a: f32, b: f32) -> f32 {
     let x = x.abs() - a;
     let y = y.abs() - b;
     if x > 0.0 && y > 0.0 {
@@ -248,18 +248,27 @@ pub fn bx2(x: f32, y: f32, a: f32, b: f32) -> f32 {
     }
 }
 
-pub fn bx3(x: f32, y: f32, z: f32, a: f32, b: f32, c: f32) -> f32 {
+pub fn box3(x: f32, y: f32, z: f32, a: f32, b: f32, c: f32) -> f32 {
     let p = v3(x, y, z);
     let b = v3(a, b, c);
     let sdf = sd_box(b, ZERO3, I);
     sdf(p)
 }
 
-pub fn rot01(x: f32, y: f32, a: f32) -> Vec2 {
+pub fn rot0(x: f32, y: f32) -> [f32; 2] {
     let v = Vec2::new(x, y);
-    let a = a * TAU;
+    let a = 0.1 * TAU;
     let m = Mat2::from_angle(a);
-    m * v
+    let result = m * v;
+    [result.x, result.y]
+}
+
+pub fn rot1(x: f32, y: f32) -> [f32; 2] {
+    let v = Vec2::new(x, y);
+    let a = 0.2 * TAU;
+    let m = Mat2::from_angle(a);
+    let result = m * v;
+    [result.x, result.y]
 }
 
 pub fn rot(x: f32, y: f32, c: f32, s: f32) -> Vec2 {
