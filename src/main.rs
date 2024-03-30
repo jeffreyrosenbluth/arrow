@@ -45,7 +45,7 @@ fn main() {
 fn signed_distance_fucntion(p: Vec3) -> f32 {
     use arrow::functions::*;
     let Vec3 { x, y, z } = p;
-    let (a0, a1) = (0.1, 0.2);
+    let (_, a1) = (0.1, 0.2);
     let y = y - 9.8f32;
     let [x, z] = rot0(x, z);
     let a = x;
@@ -66,7 +66,7 @@ fn signed_distance_fucntion(p: Vec3) -> f32 {
     let a = abs(x);
     let b = y;
     let an = 0.3f32;
-    let [a, b] = rot(a, b, cos(an), sin(an));
+    let [a, _] = rot(a, b, cos(an), sin(an));
     let d = union(vec![
         intersect(vec![
             union(vec![
