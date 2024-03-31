@@ -2,6 +2,7 @@
 name = "arrow"
 version = "0.1.0"
 edition = "2021"
+default-run = "arrow"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,3 +17,11 @@ serde = { version = "1.0.196", features = ["derive"] }
 winnow = "0.6.5"
 wassily = "0.1.0"
 pretty = "0.12.3"
+
+[[bin]]
+name = "arrow"
+path = "src/main.rs"
+
+[[bin]]
+name = "sdf_gen"
+path = "src/sdf_gen.rs"

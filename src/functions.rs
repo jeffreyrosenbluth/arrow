@@ -2,8 +2,8 @@ use glam::{Mat2, Vec2, Vec3};
 use std::f32::consts::TAU;
 
 use crate::{
-    core::{fbm, v3, I, ZERO3},
-    sdf::{sd_box, sd_torus},
+    core::{v3, I, ZERO3},
+    sdf::sd_torus,
 };
 
 pub fn sin(x: f32) -> f32 {
@@ -139,31 +139,48 @@ pub fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
-pub fn length(x: f32, y: f32, z: f32) -> f32 {
-    v3(x, y, z).length()
+#[macro_export]
+macro_rules! length {
+    ($a:expr, $b:expr, $c:expr) => {
+        v3($a, $b, $c).length()
+    };
+    ($a:expr, $b:expr) => {
+        Vec2::new($a, $b).length()
+    };
 }
 
-pub fn distance(x1: f32, y1: f32, z1: f32, x2: f32, y2: f32, z2: f32) -> f32 {
-    if y1 == 0.0 && z2 == 0.0 {
-        Vec2::new(x1, y1).distance(Vec2::new(z1, x2))
-    } else {
-        v3(x1, y1, z1).distance(v3(x2, y2, z2))
-    }
+#[macro_export]
+macro_rules! distance {
+    ($a:expr, $b:expr, $c:expr, $d:expr) => {
+        Vec2::new($a, $b).distance(Vec2::new($c, $d))
+    };
+    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr) => {
+        Vec3::new($a, $b, $c).distance(Vec3::new($d, $e, $f))
+    };
 }
-pub fn dot(x1: f32, y1: f32, z1: f32, x2: f32, y2: f32, z2: f32) -> f32 {
-    if y1 == 0.0 && z2 == 0.0 {
-        Vec2::new(x1, y1).dot(Vec2::new(z1, x2))
-    } else {
-        v3(x1, y1, z1).dot(v3(x2, y2, z2))
-    }
+
+#[macro_export]
+macro_rules! dot {
+    ($a:expr, $b:expr, $c:expr, $d:expr) => {
+        Vec2::new($a, $b).dot(Vec2::new($c, $d))
+    };
+    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr) => {
+        Vec3::new($a, $b, $c).dot(Vec3::new($d, $e, $f))
+    };
 }
 
 pub fn cross(x1: f32, y1: f32, z1: f32, x2: f32, y2: f32, z2: f32) -> Vec3 {
     v3(x1, y1, z1).cross(v3(x2, y2, z2))
 }
 
-pub fn normalize(x: f32, y: f32, z: f32) -> Vec3 {
-    v3(x, y, z).normalize()
+#[macro_export]
+macro_rules! normalize {
+    ($a:expr, $b:expr, $c:expr) => {
+        v3($a, $b, $c).normalize()
+    };
+    ($a:expr, $b:expr) => {
+        Vec2::new($a, $b).normalize()
+    };
 }
 
 pub fn union(xs: Vec<f32>) -> f32 {
@@ -192,8 +209,14 @@ pub fn intersect(xs: Vec<f32>) -> f32 {
         .unwrap()
 }
 
-pub fn add_mul(x: f32, y: f32, z: f32, a: f32, b: f32, c: f32, t: f32) -> Vec3 {
-    v3(x + a * t, y + b * t, z + c * t)
+#[macro_export]
+macro_rules! add_mul {
+    ($x:expr, $y:expr, $a:expr, $b:expr, $t:expr) => {
+        Vec2::new($x + $a * $t, $y + $b * $t)
+    };
+    ($x:expr, $y:expr, $z:expr, $a:expr, $b:expr, $c:expr, $t:expr) => {
+        Vec3::new($x + $a * $t, $y + $b * $t, $z + $c * $t)
+    };
 }
 
 pub fn smooth_abs(x: f32, p: f32) -> f32 {
@@ -237,42 +260,61 @@ pub fn torus(x: f32, y: f32, z: f32, r1: f32, r2: f32) -> f32 {
     sdf(p)
 }
 
-pub fn value_noise(x: f32, y: f32, z: f32, scale: f32, offset: f32, octaves: f32) -> f32 {
-    fbm(x, y, z, scale, offset, octaves as u32)
+#[macro_export]
+macro_rules! value_noise {
+    ($x:expr, $y:expr, $z:expr, $s:expr, $i:expr, $o:expr) => {
+        fbm($x, $y, $z, $s, $i, $o as u32)
+    };
+    ($x:expr, $y:expr, $z:expr, $s:expr, $i:expr) => {
+        fbm($x, $y, $z, $s, $i, 1u32)
+    };
 }
 
 pub fn hash(x: f32, y: f32, z: f32) -> f32 {
     crate::core::hash(v3(x, y, z))
 }
 
-pub fn box2(x: f32, y: f32, a: f32, b: f32) -> f32 {
-    let x = x.abs() - a;
-    let y = y.abs() - b;
-    if x > 0.0 && y > 0.0 {
-        v3(x, y, 0.0).length()
-    } else {
-        x.max(y)
-    }
+#[macro_export]
+macro_rules! box2 {
+    ($x:expr, $y:expr, $a:expr, $b:expr) => {{
+        let x = $x.abs() - $a;
+        let y = $y.abs() - $b;
+        if x > 0.0 && y > 0.0 {
+            Vec2::new(x, y).length()
+        } else {
+            x.max(y)
+        }
+    }};
+    ($x:expr, $y:expr, $a:expr) => {{
+        let x = $x.abs() - $a;
+        let y = $y.abs() - $a;
+        if x > 0.0 && y > 0.0 {
+            Vec2::new(x, y).length()
+        } else {
+            x.max(y)
+        }
+    }};
 }
 
-pub fn box3(x: f32, y: f32, z: f32, a: f32, b: f32, c: f32) -> f32 {
-    let p = v3(x, y, z);
-    let b = v3(a, b, c);
-    let sdf = sd_box(b, ZERO3, I);
-    sdf(p)
+#[macro_export]
+macro_rules! box3 {
+    ($x:expr, $y:expr, $z:expr, $a:expr, $b:expr, $c:expr) => {{
+        let p = v3($x, $y, $z);
+        let b = v3($a, $b, $c);
+        let sdf = sd_box(b, ZERO3, I);
+        sdf(p)
+    }};
+    ($x:expr, $y:expr, $z:expr, $a:expr) => {{
+        let p = v3($x, $y, $z);
+        let b = v3($a, $a, $a);
+        let sdf = sd_box(b, ZERO3, I);
+        sdf(p)
+    }};
 }
 
-pub fn rot0(x: f32, y: f32) -> [f32; 2] {
+pub fn rot0(x: f32, y: f32, a: f32) -> [f32; 2] {
     let v = Vec2::new(x, y);
     let a = 0.1 * TAU;
-    let m = Mat2::from_angle(a);
-    let result = m * v;
-    [result.x, result.y]
-}
-
-pub fn rot1(x: f32, y: f32) -> [f32; 2] {
-    let v = Vec2::new(x, y);
-    let a = 0.2 * TAU;
     let m = Mat2::from_angle(a);
     let result = m * v;
     [result.x, result.y]

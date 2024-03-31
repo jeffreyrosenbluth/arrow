@@ -1,14 +1,12 @@
 use crate::ast::{AssignExpr, BinOp, Expr, FunctionName, Statement};
 use pretty::RcDoc;
 
-pub fn generate_code(ast: &Statement) -> String {
-    let doc = RcDoc::text("fn signed_distance_fucntion(p: Vec3) -> f32 {")
-        .append(RcDoc::line())
-        .append(RcDoc::text("use arrow::functions::*;"))
+pub fn generate_code(ast: &Statement, a0: f32, a1: f32) -> String {
+    let doc = RcDoc::text("pub fn signed_distance_fucntion(p: Vec3) -> f32 {")
         .append(RcDoc::line())
         .append(RcDoc::text("let Vec3 {x, y, z} = p;"))
         .append(RcDoc::line())
-        .append(RcDoc::text("let (a0, a1) = (0.1, 0.2);"))
+        .append(RcDoc::text(format!("let (a0, a1) = ({}, {});", a0, a1)))
         .append(RcDoc::line())
         .append(ast.to_doc())
         .append(RcDoc::line())
@@ -104,18 +102,18 @@ impl Expr {
                 doc.append(RcDoc::text("])"))
             }
             Expr::Function { ref name, ref args } => {
+                let mut args = args.clone();
+                if *name == FunctionName::Rot0 {
+                    args.push(Expr::Variable("a0".to_string()));
+                } else if *name == FunctionName::Rot1 {
+                    args.push(Expr::Variable("a1".to_string()));
+                }
                 let mut doc = name.to_doc().append(RcDoc::text("("));
                 for (i, arg) in args.iter().enumerate() {
                     doc = doc.append(arg.to_doc(0));
                     if i < args.len() - 1 {
                         doc = doc.append(RcDoc::text(", "));
                     }
-                }
-                if args.len() < 3 && *name == FunctionName::Length {
-                    doc = doc.append(RcDoc::text(", 0.0"));
-                }
-                if args.len() < 6 && *name == FunctionName::ValueNoise {
-                    doc = doc.append(RcDoc::text(", 1.0"));
                 }
                 doc.append(RcDoc::text(")"))
             }
@@ -290,23 +288,23 @@ impl FunctionName {
             FunctionName::Clamp => RcDoc::text("clamp"),
             FunctionName::Mix => RcDoc::text("mix"),
             FunctionName::Smoothstep => RcDoc::text("smoothstep"),
-            FunctionName::Length => RcDoc::text("length"),
-            FunctionName::Distance => RcDoc::text("distance"),
-            FunctionName::Dot => RcDoc::text("dot"),
+            FunctionName::Length => RcDoc::text("length!"),
+            FunctionName::Distance => RcDoc::text("distance!"),
+            FunctionName::Dot => RcDoc::text("dot!"),
             FunctionName::Union => RcDoc::text("union"),
             FunctionName::Intersect => RcDoc::text("intersect"),
             FunctionName::Cross => RcDoc::text("cross"),
-            FunctionName::Normalize => RcDoc::text("normalize"),
+            FunctionName::Normalize => RcDoc::text("normalize!"),
             FunctionName::RoundMin => RcDoc::text("round_min"),
             FunctionName::RoundMax => RcDoc::text("round_max"),
             FunctionName::SmoothAbs => RcDoc::text("smooth_abs"),
             FunctionName::PolySmoothAbs => RcDoc::text("poly_smooth_abs"),
             FunctionName::SmoothClamp => RcDoc::text("smooth_clamp"),
             FunctionName::PolySmoothClamp => RcDoc::text("poly_smooth_clamp"),
-            FunctionName::ValueNoise => RcDoc::text("value_noise"),
+            FunctionName::ValueNoise => RcDoc::text("value_noise!"),
             FunctionName::Torus => RcDoc::text("torus"),
-            FunctionName::Box2 => RcDoc::text("box2"),
-            FunctionName::Box3 => RcDoc::text("box3"),
+            FunctionName::Box2 => RcDoc::text("box2!"),
+            FunctionName::Box3 => RcDoc::text("box3!"),
             FunctionName::Rot0 => RcDoc::text("rot0"),
             FunctionName::Rot1 => RcDoc::text("rot1"),
             FunctionName::Rot => RcDoc::text("rot"),
@@ -314,7 +312,7 @@ impl FunctionName {
             FunctionName::Corner => RcDoc::text("corner"),
             FunctionName::FakeSine => RcDoc::text("fake_sine"),
             FunctionName::Hash => RcDoc::text("hash"),
-            FunctionName::AddMul => RcDoc::text("add_mul"),
+            FunctionName::AddMul => RcDoc::text("add_mul!"),
             FunctionName::Round => RcDoc::text("round"),
         }
     }
@@ -332,7 +330,7 @@ mod tests {
         let examples = examples();
         let (mut input, _) = examples.get("ghost").unwrap();
         let ast = parse(&mut input);
-        print!("{}", generate_code(&ast));
+        print!("{}", generate_code(&ast, 0.1, 0.2));
     }
 
     #[test]

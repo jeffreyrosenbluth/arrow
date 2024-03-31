@@ -35,10 +35,6 @@ pub fn sd_round_box(b: Vec3, radius: f32, center: Vec3, transform: Affine3A) -> 
         q.x.max(q.y).max(q.z).min(0.0) + q.max(Vec3::ZERO).length() - radius
     })
 }
-// float sdTorus(vec3 p, float R, float r) {
-//     vec2 q = vec2(length(p.xz) - R, p.y);
-//     return length(q) - r;
-// }
 
 pub fn sd_torus(major_radius: f32, minor_radius: f32, center: Vec3, transform: Affine3A) -> Sdf {
     Box::new(move |p| {
@@ -131,7 +127,7 @@ pub fn examples<'a>() -> HashMap<&'a str, (&'a str, Vec3)> {
         "cross",
         (
             "U( bx3(mod(x,4)-2,y,z,6), bx3(x,y,mod(x,4)-2,6), L(TR(x),y)-1, L(x+20,y-20,z-20)-8)",
-            v3(-10.0, 20.0, -10.0),
+            v3(-10.0, 30.0, -15.0),
         ),
     );
     examples.insert(
@@ -144,19 +140,25 @@ pub fn examples<'a>() -> HashMap<&'a str, (&'a str, Vec3)> {
     examples.insert("rot_cube", ("[a,b]=r0(x,y-9); bx3(a,b,z,4)-.5", pos));
     examples.insert(
         "hyperplane",
-        ("a=(2*x-3*z+6*y)/7,b=(7*x-2*z+26*y)/27,c=(6*z-3*x+22*y)/23,d=0,zz=0;[x,z]=r1(x,z+8),[x,y]=r0(x,y),y-=3,zz=FR(z/26-.55)*26-13,d=SM(9,-12,y+3-z*.3),U(k(k(k(bx3(x,y-5,zz,7,14,7)-1,@abc{d-B(TR($))),}L(x+99,y+445,z+32)-434)", pos),
+        (
+            "a=(2*x-3*z+6*y)/7,b=(7*x-2*z+26*y)/27,c=(6*z-3*x+22*y)/23,d=0,zz=0;[x,z]=r1(x,z+8),[x,y]=r0(x,y),y-=3,zz=FR(z/26-.55)*26-13,d=SM(9,-12,y+3-z*.3),U(k(k(k(bx3(x,y-5,zz,7,14,7)-1,@abc{d-B(TR($))),}L(x+99,y+445,z+32)-434)", 
+            v3(20.0, 0.0, -60.0)
+        ),
     );
     examples.insert(
         "desire",
-        ("[x,y]=r0(x,y-1), [x,z]=r1(x,z), yb=B(y)-22.5, U(rG(32-k(0-y-13,z-15),TR(x*.25)*4-2+4*SM(0,16,x),4),rG( B(B(L(L(x,z)-16,yb-cl(yb,-8.5,8.5))-8)-4)-2, B(B(L(B(x)-15,B(B(y)-15)-15,B(z)-15)-9)-4)-2,1 ))", pos),
+        ("[x,y]=r0(x,y-1), [x,z]=r1(x,z), yb=B(y)-22.5, U(rG(32-k(-y-13,z-15),TR(x*.25)*4-2+4*SM(0,16,x),4),rG( B(B(L(L(x,z)-16,yb-cl(yb,-8.5,8.5))-8)-4)-2, B(B(L(B(x)-15,B(B(y)-15)-15,B(z)-15)-9)-4)-2,1 ))", pos),
     );
     examples.insert(
         "singularity",
-        ("[x,z]=r0(x,z),l=L(x,y,z),n=2.0 * nz(atan2(z,x),Math.acos(y/l),l,.3,0,1),d=l-20+n*5,d=B(d)-5,d=B(d)-1,b=99,@4{b=U(b,bx2(x,y-n*3+10-$*10,100,2+$*.5)),}rU(y+20-B(n)*.2,k(0-b,d)-.4,20)", pos),
+        (
+            "[x,z]=r0(x,z),l=L(x,y,z),n=2.0 * nz(atan2(z,x),Math.acos(y/l),l,.3,0,1),d=l-20+n*5,d=B(d)-5,d=B(d)-1,b=99,@4{b=U(b,bx2(x,y-n*3+10-$*10,100,2+$*.5)),}rU(y+20-B(n)*.2,k(0-b,d)-.4,20)", 
+            v3(0.0, 0.0, -60.0)
+        ),
     );
     examples.insert(
         "gnarl",
-        ("p=B(y-18)-13,n=nz(x,y,z,.2,0,2)*2,q=mod(p,12+n*z)-1.8", pos),
+        ("p=B(y-18)-13,n=nz(x,y,z,.2,0,2)*2,q=mod(p,12+n*z)-1.8", v3(0.0, 0.0, -50.0)),
     );
     examples.insert(
         "ondu",
@@ -181,7 +183,7 @@ pub fn examples<'a>() -> HashMap<&'a str, (&'a str, Vec3)> {
     examples.insert(
         "thepath",
         (
-            "@xyz{$m=mod($,20)-10,$i=Z($/20),}d=99,g=.05,y-=20,[z,x]=r0(z,x),n=nz(x,y,z,.1,1),n1=nz(x,y,z,.3,2,3),@4{x-=20,o=$*200+20,e=B(y+n1/2+sin(z*.05+o)*10)-1,e=rG(e,B(z+sin(x*.05+o)*25)-5+n1*2,.2),@xz{$1=mod($+n*10,3)-1.5,}e=rG(e,-(B(z1)-g),.25),e=rG(e,-(B(x1)-g),.25),d=U(d,e),[x,z]=r1(z,x),y+=20,}U(d,ri(xi,yi,zi)>.4&&L(xi,yi,zi)>3?L(xm,ym,zm)-2:10)",
+            "@xyz{$m=mod($,20)-10,$i=Z($/20),}d=99,g0=.05,y-=20,[z,x]=r0(z,x),n=nz(x,y,z,.1,1),n1=nz(x,y,z,.3,2,3),@4{x-=20,o=$*200+20,e=B(y+n1/2+sin(z*.05+o)*10)-1,e=rG(e,B(z+sin(x*.05+o)*25)-5+n1*2,.2),@xz{$1=mod($+n*10,3)-1.5,}e=rG(e,-(B(z1)-g0),.25),e=rG(e,-(B(x1)-g0),.25),d=U(d,e),[x,z]=r1(z,x),y+=20,}U(d,ri(xi,yi,zi)>.4&&L(xi,yi,zi)>3?L(xm,ym,zm)-2:10)",
              v3(10.0, 20.0, -25.0)
             )
     );
