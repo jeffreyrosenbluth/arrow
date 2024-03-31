@@ -102,18 +102,17 @@ impl Expr {
                 doc.append(RcDoc::text("])"))
             }
             Expr::Function { ref name, ref args } => {
-                let mut args = args.clone();
-                if *name == FunctionName::Rot0 {
-                    args.push(Expr::Variable("a0".to_string()));
-                } else if *name == FunctionName::Rot1 {
-                    args.push(Expr::Variable("a1".to_string()));
-                }
                 let mut doc = name.to_doc().append(RcDoc::text("("));
                 for (i, arg) in args.iter().enumerate() {
                     doc = doc.append(arg.to_doc(0));
                     if i < args.len() - 1 {
                         doc = doc.append(RcDoc::text(", "));
                     }
+                }
+                if *name == FunctionName::Rot0 {
+                    doc = doc.append(RcDoc::text(", a0"));
+                } else if *name == FunctionName::Rot1 {
+                    doc = doc.append(RcDoc::text(", a1"));
                 }
                 doc.append(RcDoc::text(")"))
             }
@@ -306,7 +305,7 @@ impl FunctionName {
             FunctionName::Box2 => RcDoc::text("box2!"),
             FunctionName::Box3 => RcDoc::text("box3!"),
             FunctionName::Rot0 => RcDoc::text("rot0"),
-            FunctionName::Rot1 => RcDoc::text("rot1"),
+            FunctionName::Rot1 => RcDoc::text("rot0"),
             FunctionName::Rot => RcDoc::text("rot"),
             FunctionName::Triangle => RcDoc::text("triangle"),
             FunctionName::Corner => RcDoc::text("corner"),

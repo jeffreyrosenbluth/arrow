@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::core::{fbm, hash, modulo, v3, I, ZERO3};
+use crate::core::{fbm_value, hash, modulo, v3, I, ZERO3};
 use crate::sdf::{sd_box, sd_torus};
 use core::panic;
 use glam::{Mat2, Vec2, Vec3};
@@ -968,7 +968,7 @@ fn eval_function(env: &mut Environment, name: FunctionName, args: Vec<Expr>) -> 
                     ScalarVal(scale),
                     ScalarVal(offset),
                     ScalarVal(octaves),
-                ) => ScalarVal(fbm(x, y, z, scale, offset, octaves as u32)),
+                ) => ScalarVal(fbm_value(x, y, z, scale, offset, octaves as u32)),
                 _ => panic!("noise expects scalar values"),
             }
         }

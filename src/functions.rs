@@ -263,10 +263,10 @@ pub fn torus(x: f32, y: f32, z: f32, r1: f32, r2: f32) -> f32 {
 #[macro_export]
 macro_rules! value_noise {
     ($x:expr, $y:expr, $z:expr, $s:expr, $i:expr, $o:expr) => {
-        fbm($x, $y, $z, $s, $i, $o as u32)
+        fbm_value($x, $y, $z, $s, $i, $o as u32)
     };
     ($x:expr, $y:expr, $z:expr, $s:expr, $i:expr) => {
-        fbm($x, $y, $z, $s, $i, 1u32)
+        fbm_value($x, $y, $z, $s, $i, 1u32)
     };
 }
 
@@ -314,7 +314,7 @@ macro_rules! box3 {
 
 pub fn rot0(x: f32, y: f32, a: f32) -> [f32; 2] {
     let v = Vec2::new(x, y);
-    let a = 0.1 * TAU;
+    let a = a * TAU;
     let m = Mat2::from_angle(a);
     let result = m * v;
     [result.x, result.y]

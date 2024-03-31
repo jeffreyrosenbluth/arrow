@@ -1,5 +1,6 @@
 use ::noise::{Fbm, NoiseFn, Perlin};
 use glam::{Affine3A, Vec3};
+use noise::MultiFractal;
 // use serde::de;
 
 pub const I: Affine3A = Affine3A::IDENTITY;
@@ -219,8 +220,16 @@ pub fn noise(x: Vec3) -> f32 {
         - 1.0
 }
 
+pub fn fbm_perlin(x: f32, y: f32, z: f32, scale: f32, offset: f32, octaves: u32) -> f32 {
+    let mut p = v3(x, y, z) * scale;
+    let voff = v3(offset, offset, offset);
+    p = p * scale + voff;
+    let nf = Fbm::<Perlin>::new(0).set_octaves(octaves as usize);
+    nf.get([p.x as f64, p.y as f64, p.z as f64]) as f32
+}
+
 // The range of the noise depends on the number of octaves.
-pub fn fbm(x: f32, y: f32, z: f32, scale: f32, offset: f32, octaves: u32) -> f32 {
+pub fn fbm_value(x: f32, y: f32, z: f32, scale: f32, offset: f32, octaves: u32) -> f32 {
     let mut p = v3(x, y, z) * scale;
     let voff = v3(offset, offset, offset);
     let mut a = 1.0;
@@ -240,7 +249,7 @@ mod tests {
     fn test_noise() {
         for i in 0..100 {
             let w = i as f32;
-            let n = fbm(w / 2.375, w / 11.8, w / 20.73, 0.03, 0.0, 4);
+            let n = fbm_value(w / 2.375, w / 11.8, w / 20.73, 0.03, 1.0, 4);
             println!("Noise: {}", n);
         }
     }
