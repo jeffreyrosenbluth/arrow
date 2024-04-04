@@ -270,6 +270,16 @@ macro_rules! value_noise {
     };
 }
 
+#[macro_export]
+macro_rules! perlin_noise {
+    ($x:expr, $y:expr, $z:expr, $s:expr, $i:expr, $o:expr) => {
+        fbm_perlin($x, $y, $z, $s, $i, $o as u32)
+    };
+    ($x:expr, $y:expr, $z:expr, $s:expr, $i:expr) => {
+        fbm_perlin($x, $y, $z, $s, $i, 1u32)
+    };
+}
+
 pub fn hash(x: f32, y: f32, z: f32) -> f32 {
     crate::core::hash(v3(x, y, z))
 }

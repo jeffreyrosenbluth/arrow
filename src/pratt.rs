@@ -302,7 +302,7 @@ mod tests {
 
     #[test]
     fn show() {
-        let mut i = "[x,y,z] = [y, z, x]";
+        let mut i = "i=mod(floor(x/8)+floor(z/8),2),x=mod(x,8)-4,z=mod(z,8)-4,a=L(x,y,z)-1,q=L(x,z),b=max(D([1,.3],[q,y]),-5-y),a=rU(a,b,1),y+=1,a=rU(a,L(x,y*5,z)-.8,1),y+=3,a=rU(a,L(x,y*2,z)-1,.5),y+=1,a=rU(a,L(x,y*3,z)-1.7,0.1),min(a,y+.5*i*nz(x,y,z,8,0))";
         let s = parse(&mut i);
         dbg!(s);
     }
