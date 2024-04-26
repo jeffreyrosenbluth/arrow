@@ -82,6 +82,10 @@ pub fn scene(sdf_name: &'static str) -> Scene {
             sdf: pawns,
             camera: v3(5.0, 8.0, -20.0),
         },
+        "asurf" => Scene {
+            sdf: asurf,
+            camera: v3(2.0, 5.0, -1.0),
+        },
         _ => panic!("Unknown scene: {}", sdf_name),
     }
 }
@@ -1142,4 +1146,61 @@ pub fn pawns(p: Vec3) -> f32 {
     let y = y + 1f32;
     let a = round_min(vec![a, length!(x, y * 3f32, z) - 1.7f32, 0.1f32]);
     min(a, y + 0.05f32 * i * value_noise!(x, y, z, 4f32, 0f32))
+}
+
+pub fn asurf(p: Vec3) -> f32 {
+    let Vec3 { x, y, z } = p;
+    let (a0, _) = (0.25, 0.2);
+    let s = 1f32;
+    let z = z + 1f32;
+    let x = x + 0.7f32;
+    let l = length!(x - 3f32, y - 1f32, z - 1f32) - 1.45f32;
+    let x = x * 0.5f32;
+    let y = y * 0.5f32;
+    let z = z * 0.5f32;
+    let yy = y;
+    let x = poly_smooth_abs(x + 1f32, 0.1f32) - poly_smooth_abs(x - 1f32, 0.1f32) - x;
+    let z = poly_smooth_abs(z + 1f32, 0.1f32) - poly_smooth_abs(z - 1f32, 0.1f32) - z;
+    let y = y - 1f32;
+    let x = x - 0.3f32;
+    let [x, y] = rot0(x, y, a0);
+    let sc = 2f32 / clamp(x * x + y * y + z * z, 0.4f32, 1f32);
+    let x = x * sc;
+    let y = y * sc;
+    let z = z * sc;
+    let s = s * sc;
+    let x = poly_smooth_abs(x + 1f32, 0.1f32) - poly_smooth_abs(x - 1f32, 0.1f32) - x;
+    let z = poly_smooth_abs(z + 1f32, 0.1f32) - poly_smooth_abs(z - 1f32, 0.1f32) - z;
+    let y = y - 1f32;
+    let x = x - 0.3f32;
+    let [x, y] = rot0(x, y, a0);
+    let sc = 2f32 / clamp(x * x + y * y + z * z, 0.4f32, 1f32);
+    let x = x * sc;
+    let y = y * sc;
+    let z = z * sc;
+    let s = s * sc;
+    let x = poly_smooth_abs(x + 1f32, 0.1f32) - poly_smooth_abs(x - 1f32, 0.1f32) - x;
+    let z = poly_smooth_abs(z + 1f32, 0.1f32) - poly_smooth_abs(z - 1f32, 0.1f32) - z;
+    let y = y - 1f32;
+    let x = x - 0.3f32;
+    let [x, y] = rot0(x, y, a0);
+    let sc = 2f32 / clamp(x * x + y * y + z * z, 0.4f32, 1f32);
+    let x = x * sc;
+    let y = y * sc;
+    let z = z * sc;
+    let s = s * sc;
+    let x = poly_smooth_abs(x + 1f32, 0.1f32) - poly_smooth_abs(x - 1f32, 0.1f32) - x;
+    let z = poly_smooth_abs(z + 1f32, 0.1f32) - poly_smooth_abs(z - 1f32, 0.1f32) - z;
+    let y = y - 1f32;
+    let x = x - 0.3f32;
+    let [x, y] = rot0(x, y, a0);
+    let sc = 2f32 / clamp(x * x + y * y + z * z, 0.4f32, 1f32);
+    let x = x * sc;
+    let y = y * sc;
+    let s = s * sc;
+    round_min(vec![
+        l,
+        union(vec![yy, (length!(x, y) - 1.5f32) / s * 2f32]),
+        0.2f32,
+    ])
 }

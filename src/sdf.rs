@@ -271,5 +271,12 @@ pub fn examples<'a>() -> HashMap<&'a str, (&'a str, Vec3)> {
             v3(-10.0, 20.0, -1.0)
         )
     );
+    examples.insert(
+        "asurf",
+        (
+            "s=1, z+=1, x+=.7, l=L(x-3,y-1,z-1)-1.45, @xyz{$*=.5,}yy=y,zz=z,@4{ @xz{$=qB($+1,.1)-qB($-1,.1)-$,} y-=1,x-=.3, [x,y]=r0(x,y), sc=2./cl(x*x+y*y+z*z,.4,1), @xyzs{$*=sc,}} rU(l,U(yy,(L(x,y)-1.5)/s*2),.2)",
+            v3(0.0, 0.0, -30.0)
+        )
+    );
     examples
 }

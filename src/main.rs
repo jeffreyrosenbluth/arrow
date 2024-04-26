@@ -8,10 +8,10 @@ use arrow::sdfs::*;
 use arrow::sdf::sd_plane;
 
 const S: u32 = 1;
-const M: u32 = 7;
+const M: u32 = 1;
 const WIDTH: u32 = M * 1024 / S;
 const HEIGHT: u32 = M * 768 / S;
-const AA: u32 = 2;
+const AA: u32 = 3;
 
 fn main() {
     // use arrow::pratt::*;
@@ -21,7 +21,7 @@ fn main() {
     // let ast = parse(&mut input);
     // dbg!(&ast);
     // let sdf: Sdf = Box::new(move |p| make_sdf(&ast, 0.2, 0.4, p));
-    let Scene { sdf, camera } = scene("pawns");
+    let Scene { sdf, camera } = scene("asurf");
     let sdf: Sdf = Box::new(sdf);
     println!("sdf: {}", sdf(camera));
     let img_data = render(
