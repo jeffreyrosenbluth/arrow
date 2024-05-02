@@ -71,6 +71,7 @@ dependencies = [
  "glam",
  "image 0.25.0",
  "noise 0.9.0",
+ "nom",
  "pretty",
  "rayon",
  "serde",

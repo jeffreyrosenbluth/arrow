@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::lexer::{AssignOp, Lexer, Op, Token};
+use crate::lexer_hand::{AssignOp, Lexer, Op, TokenType};
 
 pub fn parse(i: &mut &str) -> Statement {
     let mut lexer = Lexer::new(i);
@@ -11,12 +11,12 @@ fn sequence(lexer: &mut Lexer) -> Statement {
     loop {
         let s = statement(lexer);
         statements.push(s);
-        match lexer.peek() {
-            Token::Semicolon | Token::Comma => {
+        match lexer.peek().token_type {
+            TokenType::Semicolon | TokenType::Comma => {
                 lexer.next();
             }
-            Token::Eof => break,
-            t => panic!("bad token: {:?}", t),
+            TokenType::Eof => break,
+            t => panic!("bad token: {:?}, location: {}", t, lexer.token_num),
         }
     }
     Statement::Sequence(statements)
@@ -24,37 +24,37 @@ fn sequence(lexer: &mut Lexer) -> Statement {
 
 fn statement(lexer: &mut Lexer) -> Statement {
     let lhs = lexer.next();
-    match lhs {
-        Token::Variable(ref var) => {
+    match lhs.token_type {
+        TokenType::Variable(ref var) => {
             let op = lexer.peek();
-            match op {
-                Token::Assign(_) => assign(lhs, lexer),
-                Token::Operator(op) if op == Op::Inc || op == Op::Dec => {
+            match op.token_type {
+                TokenType::Assign(_) => assign(lhs.token_type, lexer),
+                TokenType::Operator(op) if op == Op::Inc || op == Op::Dec => {
                     op_statement(var.to_string(), op, lexer)
                 }
                 _ => {
-                    let e = expr(Some(lhs), lexer);
+                    let e = expr(Some(lhs.token_type), lexer);
                     Statement::Return(Box::new(e))
                 }
             }
         }
-        Token::LBracket => {
+        TokenType::LBracket => {
             let vars = var_list(lexer);
             let token = lexer.next();
-            assert_eq!(token, Token::Assign(AssignOp::Number));
-            if let Token::LBracket = lexer.peek() {
+            assert_eq!(token.token_type, TokenType::Assign(AssignOp::Number));
+            if let TokenType::LBracket = lexer.peek().token_type {
                 lexer.next();
                 let mut rhs = Vec::new();
                 loop {
-                    if lexer.peek() == Token::RBracket {
+                    if lexer.peek().token_type == TokenType::RBracket {
                         lexer.next();
                         break;
                     }
                     rhs.push(expr(None, lexer));
-                    match lexer.next() {
-                        Token::Comma => {}
-                        Token::RBracket => break,
-                        t => panic!("bad token: {:?}", t),
+                    match lexer.next().token_type {
+                        TokenType::Comma => {}
+                        TokenType::RBracket => break,
+                        t => panic!("bad token: {:?}, location: {}", t, lexer.token_num),
                     }
                 }
                 Statement::AssignFromArray { vars, rhs }
@@ -67,22 +67,22 @@ fn statement(lexer: &mut Lexer) -> Statement {
             }
         }
         _ => {
-            let e = expr(Some(lhs), lexer);
+            let e = expr(Some(lhs.token_type), lexer);
             Statement::Return(Box::new(e))
         }
     }
 }
 
-fn assign(lhs: Token, lexer: &mut Lexer) -> Statement {
+fn assign(lhs: TokenType, lexer: &mut Lexer) -> Statement {
     let v = match lhs {
-        Token::Variable(x) => x,
+        TokenType::Variable(x) => x,
         // We have already peeked the token, so this should never happen.
         _ => unreachable!(),
     };
     let token = lexer.next();
     let mut rhs = Box::new(expr(None, lexer));
-    match token {
-        Token::Assign(a) => {
+    match token.token_type {
+        TokenType::Assign(a) => {
             let var = Box::new(Expr::Variable(v.clone()));
             rhs = match a {
                 AssignOp::Number => rhs,
@@ -92,7 +92,7 @@ fn assign(lhs: Token, lexer: &mut Lexer) -> Statement {
                 AssignOp::Div => Box::new(Expr::BinaryOp(BinOp::Div(var, rhs))),
             }
         }
-        t => panic!("bad token: {:?}", t),
+        t => panic!("bad token: {:?}, location: {}", t, lexer.token_num),
     }
     Statement::Assign {
         var: v.clone(),
@@ -129,79 +129,96 @@ fn op_statement(var: String, op: Op, lexer: &mut Lexer) -> Statement {
 fn var_list(lexer: &mut Lexer) -> Vec<String> {
     let mut vars = Vec::new();
     loop {
-        let mut token = lexer.next();
-        if let Token::Variable(v) = token {
+        let mut token = lexer.next().token_type;
+        if let TokenType::Variable(v) = token {
             vars.push(v);
-            token = lexer.next();
-            if token == Token::RBracket {
+            token = lexer.next().token_type;
+            if token == TokenType::RBracket {
                 break;
             }
-            assert_eq!(token, Token::Comma);
+            assert_eq!(
+                token,
+                TokenType::Comma,
+                "bad token: {:?}, location: {}",
+                token,
+                lexer.token_num
+            );
         }
     }
     vars
 }
 
-fn expr(token: Option<Token>, lexer: &mut Lexer) -> Expr {
+fn expr(token: Option<TokenType>, lexer: &mut Lexer) -> Expr {
     expr_bp(token, lexer, 0)
 }
 
-fn expr_bp(token: Option<Token>, lexer: &mut Lexer, min_bp: u8) -> Expr {
+fn expr_bp(token: Option<TokenType>, lexer: &mut Lexer, min_bp: u8) -> Expr {
     use Op::*;
-    let token = if let Some(t) = token { t } else { lexer.next() };
+    let token = if let Some(t) = token {
+        t
+    } else {
+        lexer.next().token_type
+    };
     let mut lhs = match token {
-        Token::ScalarVal(it) => Expr::Number(it),
-        Token::LParen => {
+        TokenType::ScalarVal(it) => Expr::Number(it),
+        TokenType::LParen => {
             let lhs = expr(None, lexer);
-            assert_eq!(lexer.next(), Token::RParen);
+            assert_eq!(
+                lexer.next().token_type,
+                TokenType::RParen,
+                "bad token: {:?}, location: {}",
+                lexer.peek(),
+                lexer.token_num
+            );
             lhs
         }
-        Token::Operator(op) => {
-            let r_bp = prefix_binding_power(Token::Operator(op));
+        TokenType::Operator(op) => {
+            let r_bp = prefix_binding_power(TokenType::Operator(op));
             let rhs = expr_bp(None, lexer, r_bp);
             match op {
                 Sub => Expr::Negate(Box::new(rhs)),
                 Add => rhs,
-                _ => panic!("bad op: {:?}", op),
+                _ => panic!("bad op: {:?}, location: {}", op, lexer.token_num),
             }
         }
-        Token::Function(name) => {
-            assert_eq!(lexer.next(), Token::LParen);
+        TokenType::Function(name) => {
+            assert_eq!(lexer.next().token_type, TokenType::LParen);
             let mut args = Vec::new();
             loop {
-                if lexer.peek() == Token::LBracket {
+                if lexer.peek().token_type == TokenType::LBracket {
                     lexer.next();
                 }
-                if lexer.peek() == Token::RParen {
+                if lexer.peek().token_type == TokenType::RParen {
                     lexer.next();
                     break;
                 }
                 args.push(expr(None, lexer));
-                match lexer.next() {
-                    Token::RParen => break,
-                    Token::Comma => {
-                        if lexer.peek() == Token::RParen {
+                dbg!(lexer.peek());
+                match lexer.next().token_type {
+                    TokenType::RParen => break,
+                    TokenType::Comma => {
+                        if lexer.peek().token_type == TokenType::RParen {
                             lexer.next();
                             break;
                         }
                     }
-                    Token::RBracket => {
-                        if lexer.peek() == Token::Comma {
+                    TokenType::RBracket => {
+                        if lexer.peek().token_type == TokenType::Comma {
                             lexer.next();
                         }
                     }
-                    t => panic!("bad token: {:?}", t),
+                    t => panic!("bad token: {:?}, location: {}", t, lexer.token_num),
                 }
             }
             Expr::Function { name, args }
         }
-        Token::Variable(name) => Expr::Variable(name),
-        t => panic!("bad token: {:?}", t),
+        TokenType::Variable(name) => Expr::Variable(name),
+        t => panic!("bad token: {:?}, location: {}", t, lexer.token_num),
     };
 
     loop {
-        let op = match lexer.peek() {
-            Token::Eof => break,
+        let op = match lexer.peek().token_type {
+            TokenType::Eof => break,
             t => t,
         };
         if let Some(l_bp) = postfix_binding_power(op.clone()) {
@@ -209,7 +226,7 @@ fn expr_bp(token: Option<Token>, lexer: &mut Lexer, min_bp: u8) -> Expr {
                 break;
             }
             if let Expr::Variable(v) = lhs {
-                lhs = if let Token::Operator(Inc) = lexer.next() {
+                lhs = if let TokenType::Operator(Inc) = lexer.next().token_type {
                     Expr::Assign(AssignExpr::Inc(v))
                 } else {
                     Expr::Assign(AssignExpr::Dec(v))
@@ -224,7 +241,7 @@ fn expr_bp(token: Option<Token>, lexer: &mut Lexer, min_bp: u8) -> Expr {
             }
             lexer.next();
             lhs = match op {
-                Token::Operator(op) => {
+                TokenType::Operator(op) => {
                     let rhs = expr_bp(None, lexer, r_bp);
                     match op {
                         Add => Expr::BinaryOp(BinOp::Add(Box::new(lhs), Box::new(rhs))),
@@ -240,16 +257,16 @@ fn expr_bp(token: Option<Token>, lexer: &mut Lexer, min_bp: u8) -> Expr {
                         LessEq => Expr::BinaryOp(BinOp::LessEq(Box::new(lhs), Box::new(rhs))),
                         And => Expr::BinaryOp(BinOp::And(Box::new(lhs), Box::new(rhs))),
                         Or => Expr::BinaryOp(BinOp::Or(Box::new(lhs), Box::new(rhs))),
-                        _ => panic!("bad op: {:?}", op),
+                        _ => panic!("bad op: {:?}, location: {}", op, lexer.token_num),
                     }
                 }
-                Token::Then => {
+                TokenType::Then => {
                     let mhs = expr_bp(None, lexer, 0);
-                    assert_eq!(lexer.next(), Token::Else);
+                    assert_eq!(lexer.next().token_type, TokenType::Else);
                     let rhs = expr_bp(None, lexer, r_bp);
                     Expr::TernaryOp(Box::new(lhs), Box::new(mhs), Box::new(rhs))
                 }
-                t => panic!("bad token: {:?}", t),
+                t => panic!("bad token: {:?}, location: {}", t, lexer.token_num),
             };
             continue;
         }
@@ -259,38 +276,38 @@ fn expr_bp(token: Option<Token>, lexer: &mut Lexer, min_bp: u8) -> Expr {
     lhs
 }
 
-fn prefix_binding_power(op: Token) -> u8 {
+fn prefix_binding_power(op: TokenType) -> u8 {
     use Op::*;
     match op {
-        Token::Operator(Add) | Token::Operator(Sub) => 17,
-        Token::Operator(Inc) | Token::Operator(Dec) => 19,
+        TokenType::Operator(Add) | TokenType::Operator(Sub) => 17,
+        TokenType::Operator(Inc) | TokenType::Operator(Dec) => 19,
         _ => panic!("bad op: {:?}", op),
     }
 }
 
-fn infix_binding_power(op: Token) -> Option<(u8, u8)> {
+fn infix_binding_power(op: TokenType) -> Option<(u8, u8)> {
     use Op::*;
     let res = match op {
-        Token::Then => (2, 1),
-        Token::Operator(Or) => (3, 4),
-        Token::Operator(And) => (5, 6),
-        Token::Operator(Eq) | Token::Operator(NotEq) => (8, 7),
-        Token::Operator(Greater)
-        | Token::Operator(Less)
-        | Token::Operator(GreaterEq)
-        | Token::Operator(LessEq) => (9, 10),
-        Token::Operator(Add) | Token::Operator(Sub) => (11, 12),
-        Token::Operator(Mul) | Token::Operator(Div) => (13, 14),
-        Token::Operator(Pow) => (16, 15),
+        TokenType::Then => (2, 1),
+        TokenType::Operator(Or) => (3, 4),
+        TokenType::Operator(And) => (5, 6),
+        TokenType::Operator(Eq) | TokenType::Operator(NotEq) => (8, 7),
+        TokenType::Operator(Greater)
+        | TokenType::Operator(Less)
+        | TokenType::Operator(GreaterEq)
+        | TokenType::Operator(LessEq) => (9, 10),
+        TokenType::Operator(Add) | TokenType::Operator(Sub) => (11, 12),
+        TokenType::Operator(Mul) | TokenType::Operator(Div) => (13, 14),
+        TokenType::Operator(Pow) => (16, 15),
         _ => return None,
     };
     Some(res)
 }
 
-fn postfix_binding_power(op: Token) -> Option<u8> {
+fn postfix_binding_power(op: TokenType) -> Option<u8> {
     use Op::*;
     match op {
-        Token::Operator(Inc) | Token::Operator(Dec) => Some(21),
+        TokenType::Operator(Inc) | TokenType::Operator(Dec) => Some(21),
         _ => None,
     }
 }
@@ -389,7 +406,7 @@ mod tests {
     fn sponge() {
         let mut i = "k(r,-U(@xyz{bx2($,$$,9),}))";
         let mut i_str: &str = &crate::expand::expand(i);
-        let tokens = crate::lexer::lex(&mut i_str).expect("lexer failed");
+        let tokens = crate::lexer_hand::lex(&mut i_str);
         dbg!(&tokens);
         let s = parse(&mut i);
         dbg!(s);

@@ -5,6 +5,8 @@ pub mod eval;
 pub mod expand;
 pub mod functions;
 pub mod lexer;
+pub mod lexer_hand;
+pub mod lexer_nom;
 pub mod march;
 pub mod pratt;
 pub mod sdf;
