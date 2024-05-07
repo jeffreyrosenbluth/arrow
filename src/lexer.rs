@@ -1,15 +1,10 @@
-use winnow::{
-    ascii::{alpha1, alphanumeric0, float, multispace0},
-    combinator::{alt, dispatch, fail, opt, peek, preceded, repeat, terminated},
-    prelude::*,
-    token::{any, take},
-};
+use core::panic;
 
 use crate::ast::FunctionName;
 use crate::expand::expand;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Token {
+pub enum TokenType {
     ScalarVal(f32),
     Operator(Op),
     Assign(AssignOp),
@@ -57,9 +52,9 @@ pub enum AssignOp {
     Div,
 }
 
-impl core::fmt::Display for Token {
+impl core::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use Token::*;
+        use TokenType::*;
         match self {
             ScalarVal(v) => write!(f, "{}", v),
             Variable(v) => write!(f, "{}", v),
@@ -69,36 +64,16 @@ impl core::fmt::Display for Token {
     }
 }
 
-impl winnow::stream::ContainsToken<Token> for Token {
-    #[inline(always)]
-    fn contains_token(&self, token: Token) -> bool {
-        *self == token
-    }
+#[derive(Clone, Debug, PartialEq)]
+pub struct Token {
+    pub token_type: TokenType,
+    pub pos: usize,
 }
 
-impl winnow::stream::ContainsToken<Token> for &'_ [Token] {
-    #[inline]
-    fn contains_token(&self, token: Token) -> bool {
-        self.iter().any(|t| *t == token)
+impl Token {
+    pub fn new(token_type: TokenType, pos: usize) -> Self {
+        Self { token_type, pos }
     }
-}
-
-impl<const LEN: usize> winnow::stream::ContainsToken<Token> for &'_ [Token; LEN] {
-    #[inline]
-    fn contains_token(&self, token: Token) -> bool {
-        self.iter().any(|t| *t == token)
-    }
-}
-
-impl<const LEN: usize> winnow::stream::ContainsToken<Token> for [Token; LEN] {
-    #[inline]
-    fn contains_token(&self, token: Token) -> bool {
-        self.iter().any(|t| *t == token)
-    }
-}
-
-pub fn lex(i: &mut &str) -> PResult<Vec<Token>> {
-    preceded(multispace0, repeat(1.., terminated(token, multispace0))).parse_next(i)
 }
 
 pub struct Lexer {
@@ -109,212 +84,258 @@ pub struct Lexer {
 impl Lexer {
     pub fn new(input: &mut &str) -> Self {
         let mut i_str: &str = &expand(input);
-        let mut tokens = lex(&mut i_str).expect("lexer failed");
+        let mut tokens = lex(&mut i_str);
         tokens.reverse();
         Lexer {
-            tokens,
+            tokens: tokens,
             token_num: 0,
         }
     }
 
     pub fn next(&mut self) -> Token {
         self.token_num += 1;
-        self.tokens.pop().unwrap_or(Token::Eof)
+        self.tokens.pop().unwrap_or(Token::new(TokenType::Eof, 0))
     }
 
     pub fn peek(&mut self) -> Token {
-        self.tokens.last().cloned().unwrap_or(Token::Eof)
+        self.tokens
+            .last()
+            .cloned()
+            .unwrap_or(Token::new(TokenType::Eof, 0))
     }
 }
 
-fn token(i: &mut &str) -> PResult<Token> {
-    use Token::*;
-    let single = dispatch! {peek(any);
-        '0'..='9' | '.' => float.map(Token::ScalarVal),
-        '(' => '('.value(LParen),
-        ')' => ')'.value(RParen),
-        '[' => '['.value(LBracket),
-        ']' => ']'.value(RBracket),
-        '{' => '{'.value(LBrace),
-        '}'=> '}'.value(RBrace),
-        ',' => ','.value(Comma),
-        ';' => ';'.value(Semicolon),
-        '+' => '+'.value(Operator(Op::Add)),
-        '-' => '-'.value(Operator(Op::Sub)),
-        '*' => '*'.value(Operator(Op::Mul)),
-        '/' => '/'.value(Operator(Op::Div)),
-        '=' => '='.value(Assign(AssignOp::Number)),
-        '>' => '>'.value(Operator(Op::Greater)),
-        '<' => '<'.value(Operator(Op::Less)),
-        '?' => '?'.value(Then),
-        ':' => ':'.value(Else),
-        _ => fail,
-    };
-    let pow = "**".value(Operator(Op::Pow));
-    let eq = "==".value(Operator(Op::Eq));
-    let neq = "!=".value(Operator(Op::NotEq));
-    let geq = ">=".value(Operator(Op::GreaterEq));
-    let leq = "<=".value(Operator(Op::LessEq));
-    let and = "&&".value(Operator(Op::And));
-    let or = "||".value(Operator(Op::Or));
-    let inc = "++".value(Operator(Op::Inc));
-    let dec = "--".value(Operator(Op::Dec));
-    let assign_add = "+=".value(Assign(AssignOp::Add));
-    let assign_sub = "-=".value(Assign(AssignOp::Sub));
-    let assign_mul = "*=".value(Assign(AssignOp::Mul));
-    let assign_div = "/=".value(Assign(AssignOp::Div));
-    alt((
-        assign_add, assign_div, assign_mul, assign_sub, inc, dec, and, or, eq, neq, geq, leq, pow,
-        single, identifier,
-    ))
-    .parse_next(i)
+pub fn lex(i: &str) -> Vec<Token> {
+    use TokenType::*;
+    let funcs = vec![
+        "sin", "cos", "tan", "atan2", "exp", "exp2", "log", "log2", "pow", "sqrt", "abs", "sign",
+        "floor", "ceil", "fract", "FR", "mod", "min", "max", "cl", "mix", "B", "SM", "L", "H", "A",
+        "D", "X", "N", "U", "G", "Z", "nz", "don", "bx2", "bx3", "r0", "r1", "TR", "k", "sB",
+        "scl", "rG", "rmax", "rU", "rmin", "acos", "asin", "atan", "sinh", "cosh", "tanh", "trunc",
+        "asinh", "acosh", "atanh", "qB", "sabs", "round", "qcl", "g", "ri", "rot",
+    ];
+    let mut tokens = Vec::new();
+    let mut cs = i.chars().enumerate().peekable();
+    while let Some((n, c)) = cs.next() {
+        match c {
+            '+' => {
+                if cs.peek().map_or(false, |&(_, c)| c == '=') {
+                    cs.next();
+                    tokens.push(Token::new(Assign(AssignOp::Add), n))
+                } else if cs.peek().map_or(false, |&(_, c)| c == '+') {
+                    cs.next();
+                    tokens.push(Token::new(Operator(Op::Inc), n))
+                } else {
+                    tokens.push(Token::new(Operator(Op::Add), n))
+                }
+            }
+            '-' => {
+                if cs.peek().map_or(false, |&(_, c)| c == '=') {
+                    cs.next();
+                    tokens.push(Token::new(Assign(AssignOp::Sub), n))
+                } else if cs.peek().map_or(false, |&(_, c)| c == '-') {
+                    cs.next();
+                    tokens.push(Token::new(Operator(Op::Dec), n))
+                } else {
+                    tokens.push(Token::new(Operator(Op::Sub), n))
+                }
+            }
+            '*' => {
+                if cs.peek().map_or(false, |&(_, c)| c == '=') {
+                    cs.next();
+                    tokens.push(Token::new(Assign(AssignOp::Mul), n))
+                } else if cs.peek().map_or(false, |&(_, c)| c == '*') {
+                    cs.next();
+                    tokens.push(Token::new(Operator(Op::Pow), n))
+                } else {
+                    tokens.push(Token::new(Operator(Op::Mul), n))
+                }
+            }
+            '/' => {
+                if cs.peek().map_or(false, |&(_, c)| c == '=') {
+                    cs.next();
+                    tokens.push(Token::new(Assign(AssignOp::Div), n))
+                } else {
+                    tokens.push(Token::new(Operator(Op::Div), n))
+                }
+            }
+            '=' => {
+                if cs.peek().map_or(false, |&(_, c)| c == '=') {
+                    cs.next();
+                    tokens.push(Token::new(Operator(Op::Eq), n))
+                } else {
+                    tokens.push(Token::new(Assign(AssignOp::Number), n))
+                }
+            }
+            '(' => tokens.push(Token::new(LParen, n)),
+            ')' => tokens.push(Token::new(RParen, n)),
+            '{' => tokens.push(Token::new(LBrace, n)),
+            '}' => tokens.push(Token::new(RBrace, n)),
+            '[' => tokens.push(Token::new(LBracket, n)),
+            ']' => tokens.push(Token::new(RBracket, n)),
+            ',' => tokens.push(Token::new(Comma, n)),
+            ';' => tokens.push(Token::new(Semicolon, n)),
+            '>' => {
+                if cs.peek().map_or(false, |&(_, c)| c == '=') {
+                    cs.next();
+                    tokens.push(Token::new(Operator(Op::GreaterEq), n))
+                } else {
+                    tokens.push(Token::new(Operator(Op::Greater), n))
+                }
+            }
+            '<' => {
+                if cs.peek().map_or(false, |&(_, c)| c == '=') {
+                    cs.next();
+                    tokens.push(Token::new(Operator(Op::LessEq), n))
+                } else {
+                    tokens.push(Token::new(Operator(Op::Less), n))
+                }
+            }
+            '?' => tokens.push(Token::new(Then, n)),
+            ':' => tokens.push(Token::new(Else, n)),
+            '|' => {
+                if cs.peek().map_or(false, |&(_, c)| c == '|') {
+                    cs.next();
+                    tokens.push(Token::new(Operator(Op::Or), n))
+                } else {
+                    panic!("Unknown operator")
+                }
+            }
+            '&' => {
+                if cs.peek().map_or(false, |&(_, c)| c == '&') {
+                    cs.next();
+                    tokens.push(Token::new(Operator(Op::And), n))
+                } else {
+                    panic!("Unknown operator")
+                }
+            }
+            '!' => {
+                if cs.peek().map_or(false, |&(_, c)| c == '=') {
+                    cs.next();
+                    tokens.push(Token::new(Operator(Op::NotEq), n))
+                } else {
+                    tokens.push(Token::new(Operator(Op::Not), n))
+                }
+            }
+            c if c.is_digit(10) || c == '.' => {
+                let mut number = String::new();
+                number.push(c);
+                while let Some(&(_, c)) = cs.peek() {
+                    if c.is_digit(10) || c == '.' {
+                        number.push(c);
+                        cs.next();
+                    } else {
+                        break;
+                    }
+                }
+                match number.parse::<f32>() {
+                    Ok(v) => tokens.push(Token::new(ScalarVal(v), n)),
+                    Err(_) => continue,
+                }
+            }
+            c if c.is_alphabetic() => {
+                let mut name = String::new();
+                name.push(c);
+                while let Some(&(_, c)) = cs.peek() {
+                    if c.is_alphanumeric() {
+                        name.push(c);
+                        cs.next();
+                    } else {
+                        break;
+                    }
+                }
+                if funcs.contains(&name.as_str()) {
+                    tokens.push(Token::new(Function(get_fname(&name.as_str())), n));
+                } else {
+                    tokens.push(Token::new(Variable(name), n));
+                }
+            }
+            c if c.is_whitespace() => continue,
+            c => panic!("Unknown character {}", c),
+        }
+    }
+    tokens
 }
 
-fn identifier(i: &mut &str) -> PResult<Token> {
-    use FunctionName::*;
-    use Token::*;
-    let c1 = take(1u8).and_then(alpha1).parse_next(i)?;
-    let c2 = opt(alphanumeric0).parse_next(i)?;
-    let s = match c2 {
-        Some(c) => format!("{}{}", c1, c),
-        None => c1.to_string(),
-    };
-    match s.as_str() {
-        "sin" => Ok(Function(Sin)),
-        "cos" => Ok(Function(Cos)),
-        "tan" => Ok(Function(Tan)),
-        "atan2" => Ok(Function(Atan2)),
-        "exp" => Ok(Function(Exp)),
-        "exp2" => Ok(Function(Exp2)),
-        "log" => Ok(Function(Log)),
-        "log2" => Ok(Function(Log2)),
-        "pow" => Ok(Function(FunctionName::Pow)),
-        "sqrt" => Ok(Function(Sqrt)),
-        "abs" => Ok(Function(Abs)),
-        "sign" => Ok(Function(Sign)),
-        "floor" => Ok(Function(Floor)),
-        "ceil" => Ok(Function(Ceil)),
-        "fract" => Ok(Function(Fract)),
-        "FR" => Ok(Function(Fract)),
-        "mod" => Ok(Function(FunctionName::Mod)),
-        "min" => Ok(Function(Min)),
-        "max" => Ok(Function(Max)),
-        "cl" => Ok(Function(Clamp)),
-        "mix" => Ok(Function(Mix)),
-        "B" => Ok(Function(Abs)),
-        "SM" => Ok(Function(Smoothstep)),
-        "L" => Ok(Function(Length)),
-        "H" => Ok(Function(Distance)),
-        "A" => Ok(Function(AddMul)),
-        "D" => Ok(Function(Dot)),
-        "X" => Ok(Function(Cross)),
-        "N" => Ok(Function(Normalize)),
-        "U" => Ok(Function(Union)),
-        "G" => Ok(Function(Intersect)),
-        "Z" => Ok(Function(Floor)),
-        "nz" => Ok(Function(ValueNoise)),
-        "don" => Ok(Function(Torus)),
-        "bx2" => Ok(Function(Box2)),
-        "bx3" => Ok(Function(Box3)),
-        "r0" => Ok(Function(Rot0)),
-        "r1" => Ok(Function(Rot1)),
-        "TR" => Ok(Function(Triangle)),
-        "k" => Ok(Function(Corner)),
-        "sB" => Ok(Function(SmoothAbs)),
-        "scl" => Ok(Function(SmoothClamp)),
-        "rG" => Ok(Function(RoundMax)),
-        "rmax" => Ok(Function(RoundMax)),
-        "rU" => Ok(Function(RoundMin)),
-        "rmin" => Ok(Function(RoundMin)),
-        "acos" => Ok(Function(Acos)),
-        "asin" => Ok(Function(Asin)),
-        "atan" => Ok(Function(Atan)),
-        "sinh" => Ok(Function(Sinh)),
-        "cosh" => Ok(Function(Cosh)),
-        "tanh" => Ok(Function(Tanh)),
-        "trunc" => Ok(Function(Trunc)),
-        "asinh" => Ok(Function(Asinh)),
-        "acosh" => Ok(Function(Acosh)),
-        "atanh" => Ok(Function(Atanh)),
-        "qB" => Ok(Function(PolySmoothAbs)),
-        "sabs" => Ok(Function(SmoothAbs)),
-        "round" => Ok(Function(Round)),
-        "qcl" => Ok(Function(PolySmoothClamp)),
-        "g" => Ok(Function(FakeSine)),
-        "ri" => Ok(Function(Hash)),
-        "rot" => Ok(Function(Rot)),
-        _ => Ok(Variable(s.to_string())),
+fn get_fname(func: &str) -> FunctionName {
+    match func {
+        "sin" => FunctionName::Sin,
+        "cos" => FunctionName::Cos,
+        "tan" => FunctionName::Tan,
+        "atan2" => FunctionName::Atan2,
+        "exp" => FunctionName::Exp,
+        "exp2" => FunctionName::Exp2,
+        "log" => FunctionName::Log,
+        "log2" => FunctionName::Log2,
+        "pow" => FunctionName::Pow,
+        "sqrt" => FunctionName::Sqrt,
+        "abs" => FunctionName::Abs,
+        "sign" => FunctionName::Sign,
+        "floor" => FunctionName::Floor,
+        "ceil" => FunctionName::Ceil,
+        "fract" => FunctionName::Fract,
+        "FR" => FunctionName::Fract,
+        "mod" => FunctionName::Mod,
+        "min" => FunctionName::Min,
+        "max" => FunctionName::Max,
+        "cl" => FunctionName::Clamp,
+        "mix" => FunctionName::Mix,
+        "B" => FunctionName::Abs,
+        "SM" => FunctionName::Smoothstep,
+        "L" => FunctionName::Length,
+        "H" => FunctionName::Distance,
+        "A" => FunctionName::AddMul,
+        "D" => FunctionName::Dot,
+        "X" => FunctionName::Cross,
+        "N" => FunctionName::Normalize,
+        "U" => FunctionName::Union,
+        "G" => FunctionName::Intersect,
+        "Z" => FunctionName::Floor,
+        "nz" => FunctionName::ValueNoise,
+        "don" => FunctionName::Torus,
+        "bx2" => FunctionName::Box2,
+        "bx3" => FunctionName::Box3,
+        "r0" => FunctionName::Rot0,
+        "r1" => FunctionName::Rot1,
+        "TR" => FunctionName::Triangle,
+        "k" => FunctionName::Corner,
+        "sB" => FunctionName::SmoothAbs,
+        "scl" => FunctionName::SmoothClamp,
+        "rG" => FunctionName::RoundMax,
+        "rmax" => FunctionName::RoundMax,
+        "rU" => FunctionName::RoundMin,
+        "rmin" => FunctionName::RoundMin,
+        "acos" => FunctionName::Acos,
+        "asin" => FunctionName::Asin,
+        "atan" => FunctionName::Atan,
+        "sinh" => FunctionName::Sinh,
+        "cosh" => FunctionName::Cosh,
+        "tanh" => FunctionName::Tanh,
+        "trunc" => FunctionName::Trunc,
+        "asinh" => FunctionName::Asinh,
+        "acosh" => FunctionName::Acosh,
+        "atanh" => FunctionName::Atanh,
+        "qB" => FunctionName::PolySmoothAbs,
+        "sabs" => FunctionName::SmoothAbs,
+        "round" => FunctionName::Round,
+        "qcl" => FunctionName::PolySmoothClamp,
+        "g" => FunctionName::FakeSine,
+        "ri" => FunctionName::Hash,
+        "rot" => FunctionName::Rot,
+        _ => panic!("Unknown function"),
     }
 }
 
 #[cfg(test)]
-
 mod tests {
     use super::*;
 
     #[test]
     fn show() {
-        // let mut input = "s=1;@5{@xyz{$=B($*2)-8,}s*=.5,}(L(x,y,z)-8)*s";
-        // let input = "ri(xi,yi,zi)>.4&&L(xi,yi,zi)>3?L(xm,ym,zm)-2:10";
+        let input = "ri(xi,yi,zi)>.4&&L(xi,yi,zi)>3?L(xm,ym,zm)-2:10";
         // let input = "i=mod(floor(x/8)+floor(z/8),2),x=mod(x,8)-4,z=mod(z,8)-4,a=L(x,y,z)-1,q=L(x,z),b=max(D([1,.3],[q,y]),-5-y),a=rU(a,b,1),y+=1,a=rU(a,L(x,y*5,z)-.8,1),y+=3,a=rU(a,L(x,y*2,z)-1,.5),y+=1,a=rU(a,L(x,y*3,z)-1.7,0.1),min(a,y+.5*i*nz(x,y,z,8,0))";
-        // let mut input = "variable0 = 1 + 2.8 * 3 - 4 / 5 % 6 ** 7";
-        let input = "k(r,-U(@xyz{bx2($,$$,9),}))";
+        // let input = "a *= 1 * 2 = 3 ** 4 + FR(3.4)";
         let i = expand(input);
-        let _ = dbg!(lex.parse_peek(&i));
-    }
-
-    #[test]
-    fn test_function() {
-        use Token::*;
-        let input = "s = G(x,y,z); t = rmin(x, y, s)";
-        let expected = vec![
-            Variable("s".to_string()),
-            Assign(AssignOp::Number),
-            Function(FunctionName::Intersect),
-            LParen,
-            Variable("x".to_string()),
-            Comma,
-            Variable("y".to_string()),
-            Comma,
-            Variable("z".to_string()),
-            RParen,
-            Semicolon,
-            Variable("t".to_string()),
-            Assign(AssignOp::Number),
-            Function(FunctionName::RoundMin),
-            LParen,
-            Variable("x".to_string()),
-            Comma,
-            Variable("y".to_string()),
-            Comma,
-            Variable("s".to_string()),
-            RParen,
-        ];
-        assert_eq!(lex.parse_peek(input), Ok(("", expected)));
-    }
-
-    #[test]
-    fn test_assign() {
-        use Op::*;
-        use Token::*;
-        let input = "variable0 = 1 + 2.8 * .3 - 4 / 5 + 6 ** 7";
-        let expected = vec![
-            Variable("variable0".to_string()),
-            Assign(AssignOp::Number),
-            ScalarVal(1.0),
-            Operator(Add),
-            ScalarVal(2.8),
-            Operator(Mul),
-            ScalarVal(0.3),
-            Operator(Sub),
-            ScalarVal(4.0),
-            Operator(Div),
-            ScalarVal(5.0),
-            Operator(Add),
-            ScalarVal(6.0),
-            Operator(Pow),
-            ScalarVal(7.0),
-        ];
-        assert_eq!(lex.parse_peek(input), Ok(("", expected)));
+        let _ = dbg!(lex(&i));
     }
 }

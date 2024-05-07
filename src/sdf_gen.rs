@@ -1,4 +1,4 @@
-use arrow::{codegen::generate_code, pratt::parse, sdf::examples};
+use arrow::{lua_gen::generate_code, parser::parse, sdf::examples};
 
 fn main() {
     let examples = examples();

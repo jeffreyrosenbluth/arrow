@@ -1,4 +1,5 @@
 use crate::ast::{AssignExpr, BinOp, Expr, FunctionName, Statement};
+use mlua::prelude::*;
 use pretty::RcDoc;
 
 pub fn generate_code(ast: &Statement, a0: f32, a1: f32) -> String {

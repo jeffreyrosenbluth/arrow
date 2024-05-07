@@ -1,13 +1,13 @@
 pub mod ast;
-pub mod codegen;
+// pub mod codegen;
 pub mod core;
 pub mod eval;
 pub mod expand;
 pub mod functions;
 pub mod lexer;
-pub mod lexer_hand;
-pub mod lexer_nom;
+pub mod lua_fns;
+pub mod lua_gen;
 pub mod march;
-pub mod pratt;
+pub mod parser;
 pub mod sdf;
 pub mod sdfs;
