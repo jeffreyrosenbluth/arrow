@@ -2,6 +2,7 @@ use arrow::core::*;
 // use arrow::eval::make_sdf;
 use arrow::march::render;
 // use arrow::sdf::examples;
+use arrow::rhai_gen::base_engine;
 use arrow::sdfs::*;
 use rhai::{Dynamic, Engine, Scope};
 
@@ -15,15 +16,17 @@ const HEIGHT: u32 = M * 768 / S;
 const AA: u32 = 3;
 
 fn main() {
-    let engine = Engine::new();
-    let rhai_ast = dbg!(engine.compile_file("./src/functions.rhai".into())).unwrap();
-    let mut scope = Scope::new();
-    let r = engine.call_fn::<f32>(
-        &mut scope,
-        &rhai_ast,
-        "union",
-        vec![-2.25f32, 1f32, 1.2f32, 1.5f32, 2.5f32, 3.5f32],
-    );
+    let engine = base_engine();
+    // let rhai_ast = dbg!(engine.compile_file("./src/functions.rhai".into())).unwrap();
+    // let mut scope = Scope::new();
+    // let r = engine.call_fn::<f32>(
+    //     &mut scope,
+    //     &rhai_ast,
+    //     "union",
+    //     vec![-2.25f32, 1f32, 1.2f32, 1.5f32, 2.5f32, 3.5f32],
+    // );
+    // let r = engine.eval::<f32>("log2(2.0)");
+    let r = engine.eval::<f32>("union([2.25, -1.0, 1.2, 1.5, 2.5, 3.5])");
     _ = dbg!(r);
 
     // use arrow::pratt::*;
